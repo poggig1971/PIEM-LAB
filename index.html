@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prezzario Regionale Lombardia 2026 — Navigatore</title>
+<style>
+:root{
+  --navy:#15295e; --navy2:#1d3a8f; --blue:#2553c7; --bg:#f4f6fb; --card:#fff;
+  --border:#dde3ef; --txt:#1c2330; --mut:#67718a;
+  --green-bg:#d9f2e4; --green:#0c7a43; --amber-bg:#fdeec9; --amber:#9a6b00; --red-bg:#fadbd8; --red:#b03a2e;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
+header{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.logo{background:#fff;color:var(--navy);font-weight:800;padding:8px 14px;border-radius:8px;font-size:18px;letter-spacing:1px;border:2px solid #c6d2ee}
+.logo small{display:block;font-size:9px;font-weight:600;letter-spacing:0;color:#445}
+h1{font-size:20px;font-weight:700}
+.sub{font-size:12px;opacity:.8;margin-top:2px}
+.hstats{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
+.hstat{background:var(--navy2);border:1px solid #3b5bb3;border-radius:8px;padding:6px 14px;text-align:center;min-width:104px}
+.hstat .k{font-size:9px;letter-spacing:.8px;text-transform:uppercase;opacity:.75}
+.hstat .v{font-size:15px;font-weight:700;margin-top:2px}
+nav.tabs{display:flex;gap:8px;padding:10px 22px;background:#fff;border-bottom:1px solid var(--border);flex-wrap:wrap;position:sticky;top:0;z-index:30}
+.tab{border:1px solid var(--border);background:#fff;border-radius:18px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)}
+.tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tab .n{font-weight:400;font-size:11px;opacity:.7;margin-left:4px}
+main{display:flex;gap:0;min-height:calc(100vh - 130px)}
+aside{width:330px;min-width:330px;background:#fff;border-right:1px solid var(--border);padding:14px;overflow:auto;max-height:calc(100vh - 130px);position:sticky;top:53px}
+.searchbox{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.searchbox input[type=text]{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none}
+.searchbox input[type=text]:focus{border-color:var(--blue)}
+.opts{display:flex;gap:12px;font-size:12px;color:var(--mut);flex-wrap:wrap}
+.opts label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.treetitle{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:12px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.treetitle button{font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer}
+ul.tree{list-style:none}
+ul.tree ul{list-style:none;padding-left:16px}
+.tnode{display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:6px;cursor:pointer;font-size:12.5px;line-height:1.3}
+.tnode:hover{background:#eef2fb}
+.tnode.sel{background:var(--navy);color:#fff}
+.tnode .car{width:12px;font-size:9px;color:var(--mut);flex-shrink:0;transition:transform .12s}
+.tnode.open .car{transform:rotate(90deg)}
+.tnode .cnt{margin-left:auto;font-size:10px;color:var(--mut);flex-shrink:0}
+.tnode.sel .cnt{color:#cfd9f3}
+section.content{flex:1;padding:16px 22px;overflow:auto}
+.crumb{font-size:12px;color:var(--mut);margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.crumb b{color:var(--navy)}
+.crumb button{border:none;background:#e8edf8;border-radius:10px;padding:2px 10px;font-size:11px;color:var(--navy);cursor:pointer}
+.bar{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.bar .res{font-size:13px;color:var(--mut)}
+.bar .exp{margin-left:auto;border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer}
+.bar .exp:hover{background:#eef2fb}
+table.lst{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(21,41,94,.08)}
+table.lst thead th{background:var(--navy);color:#fff;text-align:left;font-size:12px;padding:10px 12px;position:sticky;top:53px;cursor:pointer;user-select:none;white-space:nowrap}
+table.lst thead th.num{text-align:right}
+table.lst tbody td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+table.lst tbody tr:hover{background:#f0f4fd;cursor:pointer}
+td.cod{font-family:Consolas,monospace;font-size:11.5px;color:var(--navy);white-space:nowrap;font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+td.um{white-space:nowrap;color:var(--mut)}
+.badge{display:inline-block;border-radius:10px;padding:2px 9px;font-size:11px;font-weight:700}
+.b-green{background:var(--green-bg);color:var(--green)}
+.b-amber{background:var(--amber-bg);color:var(--amber)}
+.b-red{background:var(--red-bg);color:var(--red)}
+.b-blue{background:#dce6fb;color:var(--navy)}
+.more{display:block;margin:14px auto;border:1px solid var(--border);background:#fff;border-radius:8px;padding:9px 26px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer}
+.more:hover{background:#eef2fb}
+.empty{padding:60px;text-align:center;color:var(--mut)}
+.ovl{position:fixed;inset:0;background:rgba(12,20,45,.55);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:30px 16px;overflow:auto}
+.ovl.show{display:flex}
+.panel{background:#fff;border-radius:14px;max-width:1060px;width:100%;box-shadow:0 12px 50px rgba(0,0,0,.3);margin-bottom:40px}
+.phead{background:var(--navy);color:#fff;border-radius:14px 14px 0 0;padding:16px 22px;display:flex;gap:14px;align-items:flex-start}
+.phead .cod{font-family:Consolas,monospace;font-size:13px;background:var(--navy2);padding:3px 10px;border-radius:6px;white-space:nowrap}
+.phead .x{margin-left:auto;background:none;border:none;color:#fff;font-size:22px;cursor:pointer;line-height:1}
+.pbody{padding:20px 22px}
+.ptitle{font-size:15px;font-weight:600;line-height:1.45;margin-bottom:14px}
+.kpis{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.kpi{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:130px}
+.kpi .k{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut)}
+.kpi .v{font-size:18px;font-weight:800;color:var(--navy);margin-top:3px}
+.kpi .v small{font-size:11px;font-weight:600;color:var(--mut)}
+.sect{margin-top:16px}
+.sect h3{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--navy);border-bottom:2px solid var(--navy);padding-bottom:5px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:baseline}
+.sect h3 small{color:var(--mut);text-transform:none;letter-spacing:0;font-weight:400}
+.sect .txt{font-size:13px;line-height:1.55;color:#2a3144;white-space:pre-wrap}
+.kv{display:grid;grid-template-columns:170px 1fr;gap:4px 14px;font-size:13px}
+.kv .k{color:var(--mut)}
+table.an{width:100%;border-collapse:collapse;font-size:12.5px}
+table.an th{background:#eef2fb;color:var(--navy);text-align:left;padding:7px 9px;font-size:11px}
+table.an th.num,table.an td.num{text-align:right}
+table.an td{padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+table.an tr.cat td{background:#f7f9fe;font-weight:700;color:var(--navy);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+table.an tr.foot td{font-weight:700;border-top:2px solid var(--navy);background:#fbfcff}
+table.an tr.tot td{background:var(--navy);color:#fff;font-weight:800;font-size:13px}
+table.an a{color:var(--blue);text-decoration:none;font-family:Consolas,monospace;font-size:11px}
+table.an a:hover{text-decoration:underline}
+.ld{padding:30px;text-align:center;color:var(--mut)}
+.spin{display:inline-block;width:18px;height:18px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:sp 1s linear infinite;vertical-align:middle;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+footer{padding:16px 22px;font-size:11px;color:var(--mut);text-align:center;line-height:1.6}
+mark{background:#ffe89a;padding:0 1px;border-radius:2px}
+@media(max-width:860px){aside{display:none}main{display:block}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">ANCE<small>dashboard prezzario</small></div>
+  <div>
+    <h1>Prezzario Regionale Lombardia — edizione 2026</h1>
+    <div class="sub">Fonte: Regione Lombardia, DGR XII/6071 del 27/04/2026 · codifica LOM261 · art. 41 D.Lgs. 36/2023</div>
+  </div>
+  <div class="hstats">
+    <div class="hstat"><div class="k">Opere compiute</div><div class="v" id="st-oc">…</div></div>
+    <div class="hstat"><div class="k">Risorse elementari</div><div class="v" id="st-re">…</div></div>
+    <div class="hstat"><div class="k">Analisi prezzi</div><div class="v" id="st-an">…</div></div>
+  </div>
+</header>
+
+<nav class="tabs" id="tabs"></nav>
+
+<main>
+  <aside>
+    <div class="searchbox">
+      <input type="text" id="q" placeholder="Cerca per codice o descrizione…" autocomplete="off">
+      <div class="opts">
+        <label><input type="checkbox" id="allparts"> cerca in tutte le parti</label>
+        <label><input type="checkbox" id="onlypriced" checked> solo voci con prezzo</label>
+      </div>
+    </div>
+    <div class="treetitle"><span>Sfoglia per categoria</span><button id="treset">azzera</button></div>
+    <div id="tree"></div>
+  </aside>
+
+  <section class="content">
+    <div class="crumb" id="crumb"></div>
+    <div class="bar">
+      <span class="res" id="rescount"></span>
+      <button class="exp" id="csv">&#11015; Esporta CSV</button>
+    </div>
+    <div id="results"></div>
+  </section>
+</main>
+
+<div class="ovl" id="ovl"><div class="panel" id="panel"></div></div>
+
+<footer>
+  Strumento di consultazione non ufficiale ad uso delle imprese — i dati provengono dai file XLSX pubblicati da Regione Lombardia (Prezzario 2026, LOM261, approvato con DGR XII/6071 del 27/04/2026).<br>
+  Fa fede esclusivamente la pubblicazione ufficiale di Regione Lombardia. Prezzi in euro, IVA esclusa. R.U. = incidenza percentuale della risorsa umana (manodopera).
+</footer>
+
+<script>
+"use strict";
+const PARTS = {
+  A:{label:"Parte 1 · Civile, Urbanizz., Difesa suolo, Agrofor.", short:"Parte 1 · Civile"},
+  C:{label:"Parte 2 · Impianti MEP e Antincendio", short:"Parte 2 · Impianti"},
+  E:{label:"Parte 3 · Risorse elementari", short:"Parte 3 · Risorse"},
+  F:{label:"Parte 4 · Precedente struttura", short:"Parte 4 · Prec. struttura"},
+};
+const SHARDS = {A:24,C:48,E:48};
+const S = {part:"A", data:{}, det:{}, path:null, q:"", page:0, PAGE:150, list:[], sort:null};
+
+const $=s=>document.querySelector(s);
+const fmt=(n,d=2)=>n==null?"—":n.toLocaleString("it-IT",{minimumFractionDigits:d,maximumFractionDigits:d});
+const eur=n=>n==null?"—":fmt(n)+" €";
+const norm=s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function djb2(s,n){let h=5381;for(let i=0;i<s.length;i++){h=(((h*33)>>>0)^s.charCodeAt(i))>>>0;}return h%n;}
+
+async function loadPart(p){
+  if(S.data[p]) return S.data[p];
+  const r = await fetch(`data/voci_${p}.json`);
+  const d = await r.json();
+  if(p!=="F"){ d.tree = buildTree(d.paths, d.voci); }
+  else { d.tree = buildTreeF(d.voci); }
+  S.data[p]=d;
+  updateStats();
+  return d;
+}
+function updateStats(){
+  const c=k=>S.data[k]?S.data[k].voci.length:null;
+  const oc=(c("A")||0)+(c("C")||0);
+  if(oc) $("#st-oc").textContent=oc.toLocaleString("it-IT");
+  if(c("E")) $("#st-re").textContent=c("E").toLocaleString("it-IT");
+  if(oc) $("#st-an").textContent=oc.toLocaleString("it-IT");
+}
+
+/* ---------- albero ---------- */
+function buildTree(paths,voci){
+  const root={ch:{},cnt:0};
+  const byPath=paths.map(()=>0);
+  voci.forEach(v=>byPath[v[6]]++);
+  paths.forEach((p,i)=>{
+    const parts=p.split("|");
+    let n=root;
+    n.cnt+=byPath[i];
+    parts.forEach(seg=>{
+      if(!n.ch[seg]) n.ch[seg]={ch:{},cnt:0};
+      n=n.ch[seg];
+      n.cnt+=byPath[i];
+    });
+  });
+  return root;
+}
+function buildTreeF(voci){
+  // gerarchia dal codice: 1C / 1C.00 / 1C.00.010 ... le righe senza prezzo sono nodi
+  const root={ch:{},cnt:0};
+  const nodes={};
+  voci.forEach(v=>{
+    if(v[3]>0){
+      const segs=v[0].split(".");
+      for(let l=1;l<segs.length;l++){
+        const key=segs.slice(0,l).join(".");
+        if(nodes[key]) nodes[key].cnt++;
+      }
+      root.cnt++;
+    } else {
+      nodes[v[0]]={label:v[1],cnt:0,code:v[0]};
+    }
+  });
+  // annidamento: chiave = codice, etichetta in .label
+  Object.keys(nodes).sort().forEach(k=>{
+    const segs=k.split(".");
+    let n=root;
+    for(let l=1;l<segs.length;l++){
+      const pk=segs.slice(0,l).join(".");
+      if(nodes[pk]){ n=nodes[pk]; if(!n.ch) n.ch={}; }
+    }
+    if(!n.ch) n.ch={};
+    n.ch[k]=nodes[k];
+  });
+  return root;
+}
+function renderTree(){
+  const d=S.data[S.part];
+  const el=$("#tree"); el.innerHTML="";
+  el.appendChild(treeUL(d.tree,[]));
+}
+function treeUL(node,path){
+  const ul=document.createElement("ul"); ul.className="tree";
+  const entries=Object.entries(node.ch||{});
+  entries.sort((a,b)=>a[0].localeCompare(b[0],"it"));
+  for(const [name,ch] of entries){
+    const fcode=ch.code||null;
+    const label=fcode?fcode+" — "+ch.label:name;
+    const li=document.createElement("li");
+    const div=document.createElement("div"); div.className="tnode";
+    const hasCh=ch.ch&&Object.keys(ch.ch).length>0;
+    const myPath=fcode?fcode:[...path,name].join("|");
+    div.innerHTML=`<span class="car">${hasCh?"▶":""}</span><span>${esc(label)}</span><span class="cnt">${ch.cnt.toLocaleString("it-IT")}</span>`;
+    if(S.path===myPath) div.classList.add("sel");
+    let sub=null;
+    div.onclick=()=>{
+      if(hasCh){
+        if(!sub){ sub=treeUL(ch,fcode?[]:[...path,name]); li.appendChild(sub); div.classList.add("open"); }
+        else { sub.style.display=sub.style.display==="none"?"":"none"; div.classList.toggle("open"); }
+      }
+      S.path = (S.path===myPath)?null:myPath;
+      document.querySelectorAll(".tnode.sel").forEach(x=>x.classList.remove("sel"));
+      if(S.path) div.classList.add("sel");
+      S.page=0; applyFilter();
+    };
+    li.appendChild(div); ul.appendChild(li);
+  }
+  return ul;
+}
+
+/* ---------- filtro e lista ---------- */
+async function applyFilter(){
+  const qn=norm(S.q.trim());
+  const terms=qn.split(/\s+/).filter(t=>t.length>1);
+  const onlyP=$("#onlypriced").checked;
+  const all=$("#allparts").checked && terms.length>0;
+  let rows=[];
+  const parts = all?Object.keys(PARTS):[S.part];
+  for(const p of parts){
+    const d=await loadPart(p);
+    const isF=p==="F";
+    for(const v of d.voci){
+      if(onlyP && !(v[3]>0)) continue;
+      if(!all && S.path){
+        if(isF){ if(!(v[0]===S.path||v[0].startsWith(S.path+"."))) continue; }
+        else { const pth=d.paths[v[6]]; if(!(pth===S.path||pth.startsWith(S.path+"|"))) continue; }
+      }
+      if(terms.length){
+        const hay=norm(v[0])+" "+norm(v[1])+(v[5]?" "+norm(v[5]):"")+(!isF&&v[10]?" "+norm(v[10]):"");
+        let ok=true;
+        for(const t of terms){ if(!hay.includes(t)){ok=false;break;} }
+        if(!ok) continue;
+      }
+      rows.push({p,v});
+    }
+    if(rows.length>20000) break;
+  }
+  if(S.sort){
+    const {col,dir}=S.sort;
+    rows.sort((a,b)=>{
+      let x,y;
+      if(col==="cod"){x=a.v[0];y=b.v[0];return dir*x.localeCompare(y);}
+      if(col==="prezzo"){x=a.v[3]||0;y=b.v[3]||0;}
+      else {x=a.v[4]||0;y=b.v[4]||0;}
+      return dir*(x-y);
+    });
+  }
+  S.list=rows;
+  S.page=0;
+  renderList();
+}
+function renderList(){
+  const el=$("#results");
+  const rows=S.list;
+  $("#rescount").textContent=rows.length.toLocaleString("it-IT")+" voci trovate";
+  crumb();
+  if(!rows.length){ el.innerHTML=`<div class="empty">Nessuna voce trovata.<br>Prova con altri termini o azzera i filtri.</div>`; return; }
+  const upto=Math.min(rows.length,(S.page+1)*S.PAGE);
+  let h=`<table class="lst"><thead><tr>
+    <th data-c="cod">Codice ⇅</th><th>Denominazione</th><th>U.M.</th>
+    <th class="num" data-c="prezzo">Prezzo € ⇅</th><th class="num" data-c="ru">Inc. manodopera ⇅</th><th></th>
+  </tr></thead><tbody>`;
+  const terms=norm(S.q.trim()).split(/\s+/).filter(t=>t.length>1);
+  for(let i=0;i<upto;i++){
+    const {p,v}=rows[i];
+    const hasAn=(p==="A"||p==="C");
+    let decl=esc(v[1].length>260?v[1].slice(0,260)+"…":v[1]);
+    for(const t of terms){ decl=decl.replace(new RegExp("("+t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","gi"),"<mark>$1</mark>"); }
+    const ru=v[4];
+    const ruB = ru>0 ? `<span class="badge ${ru>=40?"b-red":ru>=15?"b-amber":"b-green"}">${fmt(ru,1)}%</span>` : "—";
+    h+=`<tr data-i="${i}">
+      <td class="cod">${esc(v[0])}</td>
+      <td>${decl}</td>
+      <td class="um">${esc(v[2]||"—")}</td>
+      <td class="num">${v[3]>0?fmt(v[3]):"—"}</td>
+      <td class="num">${ruB}</td>
+      <td>${hasAn?'<span class="badge b-blue">analisi</span>':""}</td>
+    </tr>`;
+  }
+  h+="</tbody></table>";
+  if(upto<rows.length) h+=`<button class="more" id="more">Mostra altre ${Math.min(S.PAGE,rows.length-upto).toLocaleString("it-IT")} voci (${(rows.length-upto).toLocaleString("it-IT")} rimanenti)</button>`;
+  el.innerHTML=h;
+  el.querySelectorAll("tbody tr").forEach(tr=>tr.onclick=()=>openVoce(rows[+tr.dataset.i]));
+  el.querySelectorAll("thead th[data-c]").forEach(th=>th.onclick=()=>{
+    const c=th.dataset.c;
+    S.sort = (S.sort&&S.sort.col===c)?{col:c,dir:-S.sort.dir}:{col:c,dir:c==="cod"?1:-1};
+    applyFilter();
+  });
+  const m=$("#more"); if(m) m.onclick=()=>{S.page++; renderList(); };
+}
+function crumb(){
+  const el=$("#crumb");
+  let h=`<b>${PARTS[S.part].label}</b>`;
+  if(S.path) h+=` › ${esc(S.path.split("|").join(" › "))} <button id="cclr">× rimuovi filtro categoria</button>`;
+  el.innerHTML=h;
+  const b=$("#cclr"); if(b) b.onclick=()=>{S.path=null;document.querySelectorAll(".tnode.sel").forEach(x=>x.classList.remove("sel"));applyFilter();};
+}
+function showLoading(){ $("#results").innerHTML=`<div class="ld"><span class="spin"></span>Caricamento dati…</div>`; }
+
+/* ---------- dettaglio voce ---------- */
+async function getDetail(p,cod){
+  if(p==="F") return null;
+  const key=p.toLowerCase()+String(djb2(cod,SHARDS[p])).padStart(2,"0");
+  if(!S.det[key]){
+    const r=await fetch(`data/det/${key}.json`);
+    S.det[key]=await r.json();
+  }
+  return S.det[key][cod]||null;
+}
+async function openVoce({p,v}){
+  const ovl=$("#ovl"),pan=$("#panel");
+  ovl.classList.add("show");
+  document.body.style.overflow="hidden";
+  pan.innerHTML=`<div class="pbody"><div class="ld"><span class="spin"></span>Caricamento scheda…</div></div>`;
+  let det=null;
+  try{ det=await getDetail(p,v[0]); }catch(e){}
+  const an=det&&det.an;
+  let h=`<div class="phead">
+    <span class="cod">LOM261.${esc(v[0])}</span>
+    <button class="x" id="pclose">×</button>
+  </div><div class="pbody">
+  <div class="ptitle">${esc(v[1])}</div>
+  <div class="kpis">
+    <div class="kpi"><div class="k">Prezzo</div><div class="v">${eur(v[3]>0?v[3]:null)} <small>/ ${esc(v[2]||"")}</small></div></div>
+    ${det&&det.imp?`<div class="kpi"><div class="k">Importo senza S.G. e U.I.</div><div class="v">${eur(det.imp)}</div></div>`:""}
+    ${v[4]>0?`<div class="kpi"><div class="k">Incidenza manodopera</div><div class="v">${fmt(v[4],1)}%</div></div>`:""}
+    ${v[7]?`<div class="kpi"><div class="k">Prezzo elevata compl.</div><div class="v">${eur(v[7])}</div></div>`:""}
+    ${v[8]?`<div class="kpi"><div class="k">Prezzo modesta compl.</div><div class="v">${eur(v[8])}</div></div>`:""}
+    ${v[9]?`<div class="kpi"><div class="k">Voce sicurezza (_S)</div><div class="v">${eur(v[9])}</div></div>`:""}
+  </div>`;
+  if(det&&det.declx) h+=`<div class="sect"><h3>Lavorazione e specifiche tecniche</h3><div class="txt">${esc(det.declx)}</div></div>`;
+  if(an){
+    h+=`<div class="sect"><h3>Analisi prezzi <small>scomposizione in risorse elementari</small></h3>
+    <table class="an"><thead><tr><th>Codice risorsa</th><th>Descrizione</th><th>U.M.</th><th class="num">Quantità</th><th class="num">Costo unit. €</th><th class="num">Costo €</th><th class="num">Inc. %</th></tr></thead><tbody>`;
+    let lastCat="";
+    const tot=an.tot||v[3];
+    for(const r of an.ris){
+      if(r[0]!==lastCat){ h+=`<tr class="cat"><td colspan="7">Risorsa ${esc(r[0])}</td></tr>`; lastCat=r[0]; }
+      const inc=tot?100*r[6]/tot:null;
+      const link = /^(RM|RU|RS|RP)\./.test(r[1]) ? `<a href="#" data-rcod="${esc(r[1])}">${esc(r[1])}</a>` : `<span style="font-family:Consolas,monospace;font-size:11px">${esc(r[1])}</span>`;
+      h+=`<tr><td>${link}</td><td>${esc(r[2])}</td><td style="white-space:nowrap">${esc(r[3])}</td>
+        <td class="num">${fmt(r[4],3)}</td><td class="num">${fmt(r[5])}</td><td class="num">${fmt(r[6])}</td>
+        <td class="num">${inc!=null?fmt(inc,1)+"%":"—"}</td></tr>`;
+    }
+    h+=`<tr class="foot"><td colspan="5">Sommano (A)</td><td class="num">${fmt(an.som)}</td><td></td></tr>
+        <tr class="foot"><td colspan="5">Spese generali (B)${an.som?` — ${fmt(100*an.sg/an.som,1)}%`:""}</td><td class="num">${fmt(an.sg)}</td><td></td></tr>
+        <tr class="foot"><td colspan="5">Utili di impresa (C)${an.som?` — ${fmt(100*an.ui/(an.som+an.sg),1)}%`:""}</td><td class="num">${fmt(an.ui)}</td><td></td></tr>
+        <tr class="tot"><td colspan="5">PREZZO TOTALE (A + B + C)</td><td class="num">${fmt(an.tot)}</td><td></td></tr>
+    </tbody></table></div>`;
+  }
+  if(det){
+    const kv=[];
+    if(v[5]) kv.push(["Codice RL 2023 (raccordo)",`<b>${esc(v[5])}</b>`]);
+    if(det.d23) kv.push(["Declaratoria RL 2023",esc(det.d23)]);
+    if(det.crit) kv.push(["Criteri di misurazione",esc(det.crit)]);
+    if(det.inc) kv.push(["Incluso",esc(det.inc)]);
+    if(det.esc) kv.push(["Escluso",esc(det.esc)]);
+    if(det.spec) kv.push(["Specifiche",esc(det.spec)]);
+    if(det.norma) kv.push(["Norma di riferimento",esc(det.norma)]);
+    if(det.leggi) kv.push(["Riferimenti di legge",esc(det.leggi)]);
+    if(det.cam) kv.push(["CAM",esc(det.cam)]);
+    if(det.soa) kv.push(["Categoria SOA",esc(det.soa)]);
+    if(det.sett) kv.push(["Settore merceologico",esc(det.sett)]);
+    if(det.kw) kv.push(["Parole chiave",esc(det.kw)]);
+    if(kv.length){
+      h+=`<div class="sect"><h3>Dati di classificazione e raccordo</h3><div class="kv">`;
+      for(const [k,val] of kv) h+=`<div class="k">${k}</div><div>${val}</div>`;
+      h+=`</div></div>`;
+    }
+  }
+  h+=`</div>`;
+  pan.innerHTML=h;
+  const pc=document.getElementById("pclose"); if(pc) pc.onclick=closeVoce;
+  pan.querySelectorAll("a[data-rcod]").forEach(a=>a.onclick=async ev=>{
+    ev.preventDefault();
+    const cod=a.dataset.rcod;
+    const d=await loadPart("E");
+    const found=d.voci.find(x=>x[0]===cod);
+    if(found) openVoce({p:"E",v:found});
+  });
+}
+function closeVoce(){ $("#ovl").classList.remove("show"); document.body.style.overflow=""; }
+$("#ovl").addEventListener("click",e=>{ if(e.target.id==="ovl") closeVoce(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeVoce(); });
+
+/* ---------- export CSV ---------- */
+$("#csv").onclick=()=>{
+  const sep=";";
+  let csv="﻿Codice"+sep+"Denominazione"+sep+"U.M."+sep+"Prezzo"+sep+"Incidenza manodopera %"+sep+"Codice RL 2023"+sep+"Parte\n";
+  for(const {p,v} of S.list.slice(0,30000)){
+    csv+=["LOM261."+v[0],'"'+v[1].replace(/"/g,'""').replace(/\n/g," ")+'"',v[2]||"",
+      v[3]>0?String(v[3]).replace(".",","):"",v[4]>0?String(v[4]).replace(".",","):"",v[5]||"",PARTS[p].short].join(sep)+"\n";
+  }
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  a.download="prezzario_lombardia_2026_estratto.csv";
+  a.click();
+};
+
+/* ---------- tabs e avvio ---------- */
+function renderTabs(){
+  const el=$("#tabs"); el.innerHTML="";
+  for(const [p,info] of Object.entries(PARTS)){
+    const b=document.createElement("button");
+    b.className="tab"+(p===S.part?" active":"");
+    const n=S.data[p]?` <span class="n">${S.data[p].voci.length.toLocaleString("it-IT")}</span>`:"";
+    b.innerHTML=esc(info.short)+n;
+    b.onclick=async()=>{ S.part=p; S.path=null; S.sort=null; renderTabs(); showLoading(); await loadPart(p); renderTree(); applyFilter(); renderTabs(); };
+    el.appendChild(b);
+  }
+}
+let deb=null;
+$("#q").addEventListener("input",e=>{ S.q=e.target.value; clearTimeout(deb); deb=setTimeout(applyFilter,250); });
+$("#allparts").onchange=applyFilter;
+$("#onlypriced").onchange=applyFilter;
+$("#treset").onclick=()=>{ S.path=null; renderTree(); applyFilter(); };
+
+(async function init(){
+  showLoading();
+  await loadPart("A");
+  renderTabs(); renderTree(); applyFilter();
+  setTimeout(async()=>{ for(const p of ["C","E","F"]) { await loadPart(p); } renderTabs(); },800);
+})();
+</script>
+</body>
+</html>
