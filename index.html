@@ -13,8 +13,10 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--txt);font-size:14px}
 header{background:var(--navy);color:#fff;padding:14px 22px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
-.logo{background:#fff;color:var(--navy);font-weight:800;padding:8px 14px;border-radius:8px;font-size:18px;letter-spacing:1px;border:2px solid #c6d2ee}
-.logo small{display:block;font-size:9px;font-weight:600;letter-spacing:0;color:#445}
+.logo{background:#fff;border-radius:8px;padding:7px 14px;display:flex;align-items:center;gap:10px}
+.logo .a{font-weight:800;font-size:24px;color:var(--navy);letter-spacing:.5px;font-family:Arial,'Segoe UI',sans-serif}
+.logo .bar{width:3px;height:34px;background:var(--navy);flex-shrink:0}
+.logo .t{font-size:11px;font-weight:600;color:#76808f;line-height:1.3;letter-spacing:.6px;text-transform:uppercase}
 h1{font-size:20px;font-weight:700}
 .sub{font-size:12px;opacity:.8;margin-top:2px}
 .hstats{margin-left:auto;display:flex;gap:10px;flex-wrap:wrap}
@@ -52,7 +54,9 @@ section.content{flex:1;padding:16px 22px;min-width:0}
 .bar .res{font-size:13px;color:var(--mut)}
 .bar .exp{margin-left:auto;border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer}
 .bar .exp:hover{background:#eef2fb}
-table.lst{width:100%;border-collapse:collapse;background:var(--card);border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(21,41,94,.08)}
+table.lst{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(21,41,94,.08)}
+table.lst thead th:first-child{border-top-left-radius:10px}
+table.lst thead th:last-child{border-top-right-radius:10px}
 table.lst thead th{background:var(--navy);color:#fff;text-align:left;font-size:12px;padding:10px 12px;position:sticky;top:var(--ttop);cursor:pointer;user-select:none;white-space:nowrap;z-index:20}
 table.lst thead th.num{text-align:right}
 table.lst tbody td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:top}
@@ -96,8 +100,8 @@ table.an tr.foot td{font-weight:700;border-top:2px solid var(--navy);background:
 table.an tr.tot td{background:var(--navy);color:#fff;font-weight:800;font-size:13px}
 table.an a{color:var(--blue);text-decoration:none;font-family:Consolas,monospace;font-size:11px}
 table.an a:hover{text-decoration:underline}
-.flag{border:none;background:none;cursor:pointer;font-size:13px;color:var(--amber);padding:0 2px;line-height:1}
-.flag:hover{transform:scale(1.25)}
+.flag{border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;padding:3px 8px;line-height:1.2;white-space:nowrap}
+.flag:hover{filter:brightness(.95);transform:scale(1.05)}
 .sgbtn{border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0}
 .sgbtn:hover{filter:brightness(.96)}
 #ovl2{position:fixed;inset:0;background:rgba(12,20,45,.45);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:48px 16px;overflow:auto}
@@ -126,7 +130,7 @@ mark{background:#ffe89a;padding:0 1px;border-radius:2px}
 </head>
 <body>
 <header>
-  <div class="logo">ANCE<small>PIEMONTE · VALLE D'AOSTA</small></div>
+  <div class="logo"><span class="a">ANCE</span><span class="bar"></span><span class="t">Piemonte<br>Valle d'Aosta</span></div>
   <div>
     <h1>Prezzario Regionale Lombardia — edizione 2026</h1>
     <div class="sub">Fonte: Regione Lombardia, DGR XII/6071 del 27/04/2026 · codifica LOM261 · art. 41 D.Lgs. 36/2023</div>
@@ -421,7 +425,7 @@ async function openVoce({p,v}){
       h+=`<tr><td>${link}</td><td>${esc(r[2])}</td><td style="white-space:nowrap">${esc(r[3])}</td>
         <td class="num">${fmt(r[4],3)}</td><td class="num">${fmt(r[5])}</td><td class="num">${fmt(r[6])}</td>
         <td class="num">${inc!=null?fmt(inc,1)+"%":"—"}</td>
-        <td><button class="flag" data-ri="${ri}" title="Segnala anomalia su questa risorsa">⚑</button></td></tr>`;
+        <td><button class="flag" data-ri="${ri}" title="Segnala anomalia su questa risorsa (descrizione, quantità, costi)">⚑ Segnala</button></td></tr>`;
     });
     h+=`<tr class="foot"><td colspan="5">Sommano (A)</td><td class="num">${fmt(an.som)}</td><td></td><td></td></tr>
         <tr class="foot"><td colspan="5">Spese generali (B)${an.som?` — ${fmt(100*an.sg/an.som,1)}%`:""}</td><td class="num">${fmt(an.sg)}</td><td></td><td></td></tr>
