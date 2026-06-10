@@ -120,6 +120,12 @@ table.an a:hover{text-decoration:underline}
 .sgform .send:hover{background:var(--navy2)}
 .sgform .hint{font-size:11px;color:var(--mut);line-height:1.5}
 .sgform .err{color:var(--red);font-size:12px;font-weight:600;display:none}
+.chks{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+label.chk{display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;letter-spacing:0;color:var(--txt);cursor:pointer;border:1.5px solid var(--border);border-radius:8px;padding:9px 11px;margin:0}
+label.chk:hover{background:var(--bg)}
+label.chk:has(input:checked){border-color:var(--navy);background:#eef2fb;font-weight:600}
+label.chk input{width:auto;accent-color:var(--navy)}
+@media(max-width:560px){.chks{grid-template-columns:1fr}}
 .ld{padding:30px;text-align:center;color:var(--mut)}
 .spin{display:inline-block;width:18px;height:18px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:sp 1s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -478,7 +484,7 @@ function openSegnala(v,ris){
   <form class="sgform" id="sgf">
     <div class="ctx">Voce: <b>LOM261.${esc(v[0])}</b><br>${esc(v[1].slice(0,160))}${v[1].length>160?"…":""}
     ${ris?`<br><br>Risorsa contestata: <b>${esc(ris[1])}</b> — ${esc(ris[2].slice(0,100))}<br>Quantità: ${fmt(ris[4],3)} · Costo unit.: ${fmt(ris[5])} € · Costo: ${fmt(ris[6])} €`:""}</div>
-    <div><label>Tipo di anomalia *</label><select id="sg-tipo">${tipi.map(t=>`<option>${t}</option>`).join("")}</select></div>
+    <div><label>Tipo di anomalia * — selezionare una o più caselle</label><div class="chks" id="sg-tipo">${tipi.map(t=>`<label class="chk"><input type="checkbox" value="${t}"> ${t}</label>`).join("")}</div><div class="err" id="sg-err0">Selezionare almeno un tipo di anomalia.</div></div>
     <div><label>Valore o risorsa proposta (facoltativo)</label><input id="sg-val" placeholder="${ris?"es. quantità corretta, costo di mercato…":"es. codice/descrizione della risorsa mancante…"}"></div>
     <div><label>Motivazione *</label><textarea id="sg-mot" placeholder="Descrivere l'anomalia riscontrata e gli eventuali riferimenti (listini, esperienza di cantiere, offerte ricevute…)"></textarea><div class="err" id="sg-err">Indicare la motivazione della segnalazione.</div></div>
     <div class="row2">
@@ -493,6 +499,9 @@ function openSegnala(v,ris){
   $("#sgx").onclick=closeSegnala;
   $("#sgf").onsubmit=ev=>{
     ev.preventDefault();
+    const tipiSel=[...document.querySelectorAll("#sg-tipo input:checked")].map(c=>c.value);
+    if(!tipiSel.length){ $("#sg-err0").style.display="block"; return; }
+    $("#sg-err0").style.display="none";
     const mot=$("#sg-mot").value.trim();
     if(!mot){ $("#sg-err").style.display="block"; $("#sg-mot").focus(); return; }
     const L=[];
@@ -508,7 +517,7 @@ function openSegnala(v,ris){
       L.push("Quantita: "+fmt(ris[4],3)+" · Costo unitario: "+fmt(ris[5])+" € · Costo: "+fmt(ris[6])+" €");
     }
     L.push("");
-    L.push("Tipo di anomalia: "+$("#sg-tipo").value);
+    L.push("Tipi di anomalia: "+tipiSel.join("; "));
     if($("#sg-val").value.trim()) L.push("Valore/risorsa proposta: "+$("#sg-val").value.trim());
     L.push("Motivazione: "+mot);
     L.push("");
