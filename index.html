@@ -61,18 +61,23 @@ section.content{flex:1;padding:16px 22px;min-width:0}
 .bar .res{font-size:13px;color:var(--mut)}
 .bar .exp{margin-left:auto;border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer}
 .bar .exp:hover{background:#eef2fb}
-#piefilters{margin-bottom:12px;display:none}
-#piefilters .pf-lab{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:10px 0 6px}
-#piefilters .pf-row{display:flex;gap:6px;flex-wrap:wrap}
-.pfg{border:1px solid var(--border);background:#fff;border-radius:18px;padding:6px 14px;font-size:13px;font-weight:600;color:var(--navy);cursor:pointer}
-.pfg.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
-.pfc{border:1px solid var(--border);background:#fff;border-radius:8px;padding:4px 10px;font-size:12px;color:var(--txt);cursor:pointer;line-height:1.4;text-align:left}
-.pfc b{font-family:Consolas,monospace;color:var(--blue);font-weight:700;margin-right:5px}
-.pfc.com b{color:#b35c00}
-.pfc .n{color:var(--mut);font-size:10px;margin-left:5px}
-.pfc.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
-.pfc.sel b,.pfc.sel .n{color:#cfd9f3}
-.pfc:hover{border-color:var(--blue)}
+.pshead{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:12px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.pshead button{font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer}
+.psz{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:5px;cursor:pointer}
+.psz:hover{border-color:var(--blue)}
+.psz .nm{font-size:12.5px;line-height:1.3;color:var(--txt)}
+.psz .cd{font-family:Consolas,monospace;font-size:10px;color:var(--blue);margin-top:2px}
+.psz.com .cd{color:#b35c00}
+.psz.sel{background:var(--navy);border-color:var(--navy)}
+.psz.sel .nm{color:#fff}
+.psz.sel .cd{color:#cfd9f3}
+.pcaps{padding:2px 0 8px 12px}
+.pcap{font-size:12px;border:1px solid var(--border);border-radius:6px;padding:4px 8px;margin-bottom:4px;cursor:pointer;background:#fff;color:var(--txt)}
+.pcap:hover{border-color:var(--blue)}
+.pcap b{font-family:Consolas,monospace;color:var(--blue);font-weight:700;margin-right:4px;font-size:10.5px}
+.pcap .n{color:var(--mut);font-size:10px;margin-left:4px}
+.pcap.sel{background:var(--navy2);color:#fff;border-color:var(--navy2)}
+.pcap.sel b,.pcap.sel .n{color:#cfd9f3}
 table.lst{width:100%;border-collapse:separate;border-spacing:0;background:var(--card);border-radius:10px;box-shadow:0 1px 3px rgba(21,41,94,.08)}
 table.lst thead th{background:var(--navy);color:#fff;text-align:left;font-size:12px;padding:10px 12px;position:sticky;top:var(--ttop);cursor:pointer;user-select:none;white-space:nowrap;z-index:20}
 table.lst thead th:first-child{border-top-left-radius:10px}
@@ -185,7 +190,6 @@ mark{background:#ffe89a;padding:0 1px;border-radius:2px}
   </aside>
 
   <section class="content">
-    <div id="piefilters"></div>
     <div class="crumb" id="crumb"></div>
     <div class="bar">
       <span class="res" id="rescount"></span>
@@ -282,41 +286,43 @@ function buildPieIdx(d){
   });
   d.sez=sez; d.fam=fam;
 }
-function renderPieFilters(){
-  const el=$("#piefilters");
-  if(S.region!=="PIE"||!S.data.P){ el.style.display="none"; return; }
-  el.style.display="block";
+function renderPieSidebar(){
+  const el=$("#tree"); el.innerHTML="";
   const d=S.data.P;
-  const GRPS=[["LAV","Lavorazioni"],["PR","Prodotti (PR)"],["AT","Noli e attrezzature (AT)"],["RU","Manodopera (RU)"]];
-  let h='<div class="pf-lab">Gruppo</div><div class="pf-row">';
-  for(const [g,lab] of GRPS){
-    const ns=Object.values(d.sez).filter(x=>x.grp===g).length;
-    h+=`<button class="pfg${S.pieGrp===g?" sel":""}" data-g="${g}">${lab} <span style="opacity:.65;font-size:11px">${ns}</span></button>`;
-  }
-  h+='</div><div class="pf-lab">Tipologia (sezione)</div><div class="pf-row">';
-  for(const s of Object.keys(d.sez).filter(x=>d.sez[x].grp===S.pieGrp).sort()){
+  if(!d) return;
+  const item=(s)=>{
     const x=d.sez[s];
-    const nm=x.nome.length>44?x.nome.slice(0,44)+"…":x.nome;
-    h+=`<button class="pfc${s===S.pieSez?" sel":""}${s.includes("COM")?" com":""}" data-s="${s}" title="${esc(x.nome)}"><b>${esc(s)}</b>${esc(nm)}<span class="n">${x.n.toLocaleString("it-IT")}</span></button>`;
-  }
-  h+='</div>';
-  if(S.pieSez&&d.fam[S.pieSez]){
-    const fams=Object.keys(d.fam[S.pieSez]).sort();
-    if(fams.length>1){
-      h+=`<div class="pf-lab">Famiglia — capitoli di ${esc(S.pieSez)} · ${esc(d.sez[S.pieSez].nome.slice(0,44))}</div><div class="pf-row">`;
-      for(const f of fams){
-        const x=d.fam[S.pieSez][f];
-        let nm=x.nome?x.nome.charAt(0)+x.nome.slice(1).toLowerCase():f;
-        if(nm.length>44) nm=nm.slice(0,44)+"…";
-        h+=`<button class="pfc${f===S.pieFam?" sel":""}" data-f="${f}" title="${esc(x.nome)}"><b>${esc(f)}</b>${esc(nm)}<span class="n">${x.n.toLocaleString("it-IT")}</span></button>`;
+    let r=`<div class="psz${s===S.pieSez?" sel":""}${s.includes("COM")?" com":""}" data-s="${s}" title="${esc(x.nome)}">
+      <div class="nm">${esc(x.nome)}</div>
+      <div class="cd">PIE26_${esc(s)} · ${x.n.toLocaleString("it-IT")} voci</div></div>`;
+    if(s===S.pieSez&&d.fam[s]){
+      const fams=Object.keys(d.fam[s]).sort();
+      if(fams.length>1){
+        r+=`<div class="pcaps">`;
+        for(const f of fams){
+          const y=d.fam[s][f];
+          let nm=y.nome?y.nome.charAt(0)+y.nome.slice(1).toLowerCase():f;
+          if(nm.length>40) nm=nm.slice(0,40)+"…";
+          r+=`<div class="pcap${f===S.pieFam?" sel":""}" data-f="${f}" title="${esc(y.nome)}"><b>${esc(f)}</b>${esc(nm)}<span class="n">${y.n.toLocaleString("it-IT")}</span></div>`;
+        }
+        r+=`</div>`;
       }
-      h+='</div>';
     }
-  }
+    return r;
+  };
+  let h=`<div class="pshead"><span>Tipologie</span><button id="pclr">azzera filtri</button></div>`;
+  for(const s of Object.keys(d.sez).filter(x=>d.sez[x].grp==="LAV").sort()) h+=item(s);
+  h+=`<div class="pshead"><span>Famiglie</span></div>`;
+  for(const s of Object.keys(d.sez).filter(x=>d.sez[x].grp!=="LAV").sort()) h+=item(s);
   el.innerHTML=h;
-  el.querySelectorAll(".pfg").forEach(b=>b.onclick=()=>{ S.pieGrp=b.dataset.g; S.pieSez=null; S.pieFam=null; renderPieFilters(); applyFilter(); });
-  el.querySelectorAll(".pfc[data-s]").forEach(b=>b.onclick=()=>{ S.pieSez=(S.pieSez===b.dataset.s)?null:b.dataset.s; S.pieFam=null; renderPieFilters(); applyFilter(); });
-  el.querySelectorAll(".pfc[data-f]").forEach(b=>b.onclick=()=>{ S.pieFam=(S.pieFam===b.dataset.f)?null:b.dataset.f; renderPieFilters(); applyFilter(); });
+  el.querySelectorAll(".psz").forEach(b=>b.onclick=()=>{ S.pieSez=(S.pieSez===b.dataset.s)?null:b.dataset.s; S.pieFam=null; renderPieSidebar(); applyFilter(); });
+  el.querySelectorAll(".pcap").forEach(b=>b.onclick=()=>{ S.pieFam=(S.pieFam===b.dataset.f)?null:b.dataset.f; renderPieSidebar(); applyFilter(); });
+  const pc=document.getElementById("pclr");
+  if(pc) pc.onclick=()=>{
+    S.pieSez=null; S.pieFam=null; S.q=""; $("#q").value="";
+    $("#onlyan").checked=false; $("#onlycam").checked=false; $("#onlysic").checked=false; $("#onlypriced").checked=true;
+    renderPieSidebar(); applyFilter();
+  };
 }
 
 /* ---------- albero ---------- */
@@ -364,6 +370,7 @@ function buildTreeF(voci){
   return root;
 }
 function renderTree(){
+  if(S.region==="PIE"){ renderPieSidebar(); return; }
   const d=S.data[curPart()];
   const el=$("#tree"); el.innerHTML="";
   if(d) el.appendChild(treeUL(d.tree,[]));
@@ -503,7 +510,7 @@ function crumb(){
   }
   else if(S.path) h+=` › ${esc(S.path.split("|").join(" › "))} <button id="cclr">× rimuovi filtro categoria</button>`;
   el.innerHTML=h;
-  const b=$("#cclr"); if(b) b.onclick=()=>{S.path=null;S.pieSez=null;S.pieFam=null;document.querySelectorAll(".tnode.sel").forEach(x=>x.classList.remove("sel"));renderPieFilters();applyFilter();};
+  const b=$("#cclr"); if(b) b.onclick=()=>{S.path=null;S.pieSez=null;S.pieFam=null;document.querySelectorAll(".tnode.sel").forEach(x=>x.classList.remove("sel"));renderTree();applyFilter();};
 }
 function showLoading(){ $("#results").innerHTML=`<div class="ld"><span class="spin"></span>Caricamento dati…</div>`; }
 function renderRaffronto(){
@@ -741,10 +748,8 @@ function renderTabs(){
   }
   $("#lab-allparts").style.display = reg.parts.length>1 ? "" : "none";
   $("#lab-onlyan").style.display = (S.region==="PIE") ? "" : "none";
-  const isPie = S.region==="PIE";
-  document.querySelector(".treetitle").style.display = isPie ? "none" : "";
-  $("#tree").style.display = isPie ? "none" : "";
-  renderPieFilters();
+  document.querySelector(".treetitle").style.display = (S.region==="PIE") ? "none" : "";
+  renderTree();
   setSticky();
 }
 function setSticky(){
