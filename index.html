@@ -61,8 +61,16 @@ section.content{flex:1;padding:16px 22px;min-width:0}
 .bar .res{font-size:13px;color:var(--mut)}
 .bar .exp{margin-left:auto;border:1px solid var(--border);background:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;color:var(--navy);cursor:pointer}
 .bar .exp:hover{background:#eef2fb}
-.pshead{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--mut);margin:12px 0 8px;display:flex;justify-content:space-between;align-items:center}
-.pshead button{font-size:11px;border:none;background:none;color:var(--blue);cursor:pointer}
+.bluhead{background:var(--navy);color:#fff;padding:7px 12px;border-radius:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin:12px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.bluhead button{font-size:11px;border:none;background:none;color:#aac4ff;cursor:pointer;text-transform:none;letter-spacing:0}
+.bluhead button:hover{color:#fff}
+.pgr{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 12px;margin-bottom:5px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600;color:var(--navy)}
+.pgr:hover{border-color:var(--blue)}
+.pgr .n{font-size:11px;color:var(--mut);font-weight:400}
+.pgr.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
+.pgr.sel .n{color:#cfd9f3}
+#capbar{display:none;margin-bottom:12px}
+#capbar .pf-row{display:flex;gap:6px;flex-wrap:wrap}
 .psz{background:#fff;border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:5px;cursor:pointer}
 .psz:hover{border-color:var(--blue)}
 .psz .nm{font-size:12.5px;line-height:1.3;color:var(--txt)}
@@ -190,6 +198,7 @@ mark{background:#ffe89a;padding:0 1px;border-radius:2px}
   </aside>
 
   <section class="content">
+    <div id="capbar"></div>
     <div class="crumb" id="crumb"></div>
     <div class="bar">
       <span class="res" id="rescount"></span>
@@ -286,43 +295,50 @@ function buildPieIdx(d){
   });
   d.sez=sez; d.fam=fam;
 }
+const PIE_GRPS=[["LAV","Lavorazioni"],["PR","Prodotti (PR)"],["AT","Noli e attrezzature (AT)"],["RU","Manodopera (RU)"]];
 function renderPieSidebar(){
   const el=$("#tree"); el.innerHTML="";
   const d=S.data.P;
   if(!d) return;
-  const item=(s)=>{
+  let h=`<div class="bluhead"><span>Gruppo</span><button id="pclr">azzera filtri</button></div>`;
+  for(const [g,lab] of PIE_GRPS){
+    const ns=Object.keys(d.sez).filter(s=>d.sez[s].grp===g).length;
+    h+=`<div class="pgr${S.pieGrp===g?" sel":""}" data-g="${g}"><span>${lab}</span><span class="n">${ns}</span></div>`;
+  }
+  h+=`<div class="bluhead"><span>${S.pieGrp==="LAV"?"Tipologie":"Famiglie"}</span></div>`;
+  for(const s of Object.keys(d.sez).filter(x=>d.sez[x].grp===S.pieGrp).sort()){
     const x=d.sez[s];
-    let r=`<div class="psz${s===S.pieSez?" sel":""}${s.includes("COM")?" com":""}" data-s="${s}" title="${esc(x.nome)}">
+    h+=`<div class="psz${s===S.pieSez?" sel":""}${s.includes("COM")?" com":""}" data-s="${s}" title="${esc(x.nome)}">
       <div class="nm">${esc(x.nome)}</div>
       <div class="cd">PIE26_${esc(s)} · ${x.n.toLocaleString("it-IT")} voci</div></div>`;
-    if(s===S.pieSez&&d.fam[s]){
-      const fams=Object.keys(d.fam[s]).sort();
-      if(fams.length>1){
-        r+=`<div class="pcaps">`;
-        for(const f of fams){
-          const y=d.fam[s][f];
-          let nm=y.nome?y.nome.charAt(0)+y.nome.slice(1).toLowerCase():f;
-          if(nm.length>40) nm=nm.slice(0,40)+"…";
-          r+=`<div class="pcap${f===S.pieFam?" sel":""}" data-f="${f}" title="${esc(y.nome)}"><b>${esc(f)}</b>${esc(nm)}<span class="n">${y.n.toLocaleString("it-IT")}</span></div>`;
-        }
-        r+=`</div>`;
-      }
-    }
-    return r;
-  };
-  let h=`<div class="pshead"><span>Tipologie</span><button id="pclr">azzera filtri</button></div>`;
-  for(const s of Object.keys(d.sez).filter(x=>d.sez[x].grp==="LAV").sort()) h+=item(s);
-  h+=`<div class="pshead"><span>Famiglie</span></div>`;
-  for(const s of Object.keys(d.sez).filter(x=>d.sez[x].grp!=="LAV").sort()) h+=item(s);
+  }
   el.innerHTML=h;
-  el.querySelectorAll(".psz").forEach(b=>b.onclick=()=>{ S.pieSez=(S.pieSez===b.dataset.s)?null:b.dataset.s; S.pieFam=null; renderPieSidebar(); applyFilter(); });
-  el.querySelectorAll(".pcap").forEach(b=>b.onclick=()=>{ S.pieFam=(S.pieFam===b.dataset.f)?null:b.dataset.f; renderPieSidebar(); applyFilter(); });
+  el.querySelectorAll(".pgr").forEach(b=>b.onclick=()=>{ S.pieGrp=b.dataset.g; S.pieSez=null; S.pieFam=null; renderPieSidebar(); renderCapBar(); applyFilter(); });
+  el.querySelectorAll(".psz").forEach(b=>b.onclick=()=>{ S.pieSez=(S.pieSez===b.dataset.s)?null:b.dataset.s; S.pieFam=null; renderPieSidebar(); renderCapBar(); applyFilter(); });
   const pc=document.getElementById("pclr");
   if(pc) pc.onclick=()=>{
     S.pieSez=null; S.pieFam=null; S.q=""; $("#q").value="";
     $("#onlyan").checked=false; $("#onlycam").checked=false; $("#onlysic").checked=false; $("#onlypriced").checked=true;
-    renderPieSidebar(); applyFilter();
+    renderPieSidebar(); renderCapBar(); applyFilter();
   };
+}
+function renderCapBar(){
+  const el=$("#capbar");
+  const d=S.data.P;
+  if(S.region!=="PIE"||!d||!S.pieSez||!d.fam[S.pieSez]){ el.style.display="none"; el.innerHTML=""; return; }
+  const fams=Object.keys(d.fam[S.pieSez]).sort();
+  if(fams.length<2){ el.style.display="none"; el.innerHTML=""; return; }
+  let h=`<div class="bluhead" style="margin-top:0"><span>Capitoli — ${esc(S.pieSez)} · ${esc(d.sez[S.pieSez].nome.slice(0,60))}</span></div><div class="pf-row">`;
+  for(const f of fams){
+    const y=d.fam[S.pieSez][f];
+    let nm=y.nome?y.nome.charAt(0)+y.nome.slice(1).toLowerCase():f;
+    if(nm.length>44) nm=nm.slice(0,44)+"…";
+    h+=`<div class="pcap${f===S.pieFam?" sel":""}" data-f="${f}" title="${esc(y.nome)}" style="margin-bottom:0"><b>${esc(f)}</b>${esc(nm)}<span class="n">${y.n.toLocaleString("it-IT")}</span></div>`;
+  }
+  h+=`</div>`;
+  el.innerHTML=h;
+  el.style.display="block";
+  el.querySelectorAll(".pcap").forEach(b=>b.onclick=()=>{ S.pieFam=(S.pieFam===b.dataset.f)?null:b.dataset.f; renderCapBar(); applyFilter(); });
 }
 
 /* ---------- albero ---------- */
@@ -510,7 +526,7 @@ function crumb(){
   }
   else if(S.path) h+=` › ${esc(S.path.split("|").join(" › "))} <button id="cclr">× rimuovi filtro categoria</button>`;
   el.innerHTML=h;
-  const b=$("#cclr"); if(b) b.onclick=()=>{S.path=null;S.pieSez=null;S.pieFam=null;document.querySelectorAll(".tnode.sel").forEach(x=>x.classList.remove("sel"));renderTree();applyFilter();};
+  const b=$("#cclr"); if(b) b.onclick=()=>{S.path=null;S.pieSez=null;S.pieFam=null;document.querySelectorAll(".tnode.sel").forEach(x=>x.classList.remove("sel"));renderTree();renderCapBar();applyFilter();};
 }
 function showLoading(){ $("#results").innerHTML=`<div class="ld"><span class="spin"></span>Caricamento dati…</div>`; }
 function renderRaffronto(){
@@ -750,6 +766,7 @@ function renderTabs(){
   $("#lab-onlyan").style.display = (S.region==="PIE") ? "" : "none";
   document.querySelector(".treetitle").style.display = (S.region==="PIE") ? "none" : "";
   renderTree();
+  renderCapBar();
   setSticky();
 }
 function setSticky(){
