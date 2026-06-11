@@ -210,6 +210,7 @@ mark{background:#ffe89a;padding:0 1px;border-radius:2px}
         <label><input type="checkbox" id="onlycam"> solo voci CAM</label>
         <label><input type="checkbox" id="onlysic"> solo costi sicurezza</label>
         <label><input type="checkbox" id="onlyfav"> solo preferite ★</label>
+        <label title="Trova anche le lavorazioni che impiegano nella loro analisi una risorsa corrispondente alla ricerca"><input type="checkbox" id="inan"> cerca anche nelle analisi</label>
       </div>
     </div>
     <div class="treetitle"><span>Sfoglia per categoria</span><button id="treset">azzera</button></div>
@@ -308,6 +309,29 @@ async function loadPart(p){
   S.data[p]=d;
   return d;
 }
+/* ---------- ricerca nelle analisi (indice risorsa -> lavorazioni) ---------- */
+const USO={};
+async function loadUso(reg){
+  const k=reg.toLowerCase();
+  if(!USO[k]){ const r=await fetch(`data/uso_${k}.json`); USO[k]=await r.json(); }
+  return USO[k];
+}
+async function searchAnalisi(terms){
+  const idx=await loadUso(S.region);
+  const base=await loadPart(S.region==="LOM"?"E":"P");
+  const hits=new Set();
+  const match=h=>{ for(const t of terms){ if(!h.includes(t)) return false; } return true; };
+  for(const v of base.voci){
+    const u=idx.uso[v[0]];
+    if(u && match(norm(v[0])+" "+norm(v[1]))) for(const c of u) hits.add(c);
+  }
+  for(const cod in (idx.extra||{})){
+    const u=idx.uso[cod];
+    if(u && match(norm(cod)+" "+norm(idx.extra[cod]))) for(const c of u) hits.add(c);
+  }
+  return hits;
+}
+
 function pieGrpOf(s){ if(/^AT/.test(s)) return "AT"; if(/^PR/.test(s)) return "PR"; if(/^RU/.test(s)) return "RU"; return "LAV"; }
 function buildPieIdx(d){
   if(d.sez) return;
@@ -347,7 +371,7 @@ function renderPieSidebar(){
   const pc=document.getElementById("pclr");
   if(pc) pc.onclick=()=>{
     S.pieSez=null; S.pieFam=null; S.q=""; $("#q").value="";
-    $("#onlyan").checked=false; $("#onlycam").checked=false; $("#onlysic").checked=false; $("#onlyfav").checked=false; $("#onlypriced").checked=true;
+    $("#onlyan").checked=false; $("#onlycam").checked=false; $("#onlysic").checked=false; $("#onlyfav").checked=false; $("#inan").checked=false; $("#onlypriced").checked=true;
     renderPieSidebar(); renderCapBar(); applyFilter();
   };
 }
@@ -465,6 +489,10 @@ async function applyFilter(){
   const onlySic=$("#onlysic").checked;
   const onlyFav=$("#onlyfav").checked;
   const all=$("#allparts").checked && terms.length>0;
+  let anHits=null;
+  if($("#inan").checked && terms.length>0){
+    try{ anHits=await searchAnalisi(terms); }catch(e){}
+  }
   let rows=[];
   const parts = all?curReg().parts:[curPart()];
   for(const p of parts){
@@ -484,13 +512,15 @@ async function applyFilter(){
         if(isF){ if(!(v[0]===S.path||v[0].startsWith(S.path+"."))) continue; }
         else { const pth=d.paths[v[6]]; if(!(pth===S.path||pth.startsWith(S.path+"|"))) continue; }
       }
+      let viaAn=false;
       if(terms.length){
         const hay=norm(v[0])+" "+norm(v[1])+(v[5]?" "+norm(v[5]):"")+(!isF&&v[10]?" "+norm(v[10]):"");
         let ok=true;
         for(const t of terms){ if(!hay.includes(t)){ok=false;break;} }
+        if(!ok && anHits && anHits.has(v[0])){ ok=true; viaAn=true; }
         if(!ok) continue;
       }
-      rows.push({p,v});
+      rows.push({p,v,a:viaAn});
     }
     if(rows.length>20000) break;
   }
@@ -521,7 +551,7 @@ function renderList(){
   </tr></thead><tbody>`;
   const terms=norm(S.q.trim()).split(/\s+/).filter(t=>t.length>1);
   for(let i=0;i<upto;i++){
-    const {p,v}=rows[i];
+    const {p,v,a}=rows[i];
     const hasAn=hasAnalisi(p,v);
     let decl=esc(v[1].length>260?v[1].slice(0,260)+"…":v[1]);
     for(const t of terms){ decl=decl.replace(new RegExp("("+t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","gi"),"<mark>$1</mark>"); }
@@ -533,7 +563,7 @@ function renderList(){
       <td class="um">${esc(v[2]||"—")}</td>
       <td class="num">${v[3]>0?fmt(v[3]):"—"}</td>
       <td class="num">${ruB}</td>
-      <td style="white-space:nowrap"><button class="favb" data-c="${p}|${esc(v[0])}" title="Aggiungi/rimuovi dalle preferite">${favs.has(p+"|"+v[0])?"★":"☆"}</button>${hasAn?'<span class="badge b-blue">analisi</span>':""}${(p==="P"?v[12]:v[11])?' <span class="badge b-green">CAM</span>':""}${(p!=="P"&&v[9])?' <span class="badge b-amber">SIC</span>':""}</td>
+      <td style="white-space:nowrap"><button class="favb" data-c="${p}|${esc(v[0])}" title="Aggiungi/rimuovi dalle preferite">${favs.has(p+"|"+v[0])?"★":"☆"}</button>${hasAn?'<span class="badge b-blue">analisi</span>':""}${(p==="P"?v[12]:v[11])?' <span class="badge b-green">CAM</span>':""}${(p!=="P"&&v[9])?' <span class="badge b-amber">SIC</span>':""}${a?' <span class="badge b-amber" title="Il termine cercato compare in una risorsa dell\'analisi di questa voce">≈ in analisi</span>':""}</td>
     </tr>`;
   }
   h+="</tbody></table>";
@@ -837,6 +867,7 @@ $("#mtoggle").onclick=()=>{
 };
 $("#sbk").onclick=()=>{ document.querySelector("aside").classList.remove("open"); $("#sbk").classList.remove("show"); };
 $("#onlyfav").onchange=applyFilter;
+$("#inan").onchange=applyFilter;
 let deb=null;
 $("#q").addEventListener("input",e=>{ S.q=e.target.value; clearTimeout(deb); deb=setTimeout(applyFilter,250); });
 $("#allparts").onchange=applyFilter;
