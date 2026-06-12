@@ -95,7 +95,9 @@ for cod in sorted(serie):
     if c26 not in p26: c26 = None
     s = cod[:2]
     if v["sezn"]: sez_names.setdefault(s, v["sezn"][:70])
-    def p(x): return round(x, 4) if x else None
+    # 2 decimali: i prezzi pubblicati sono a 2 decimali; il listino 2026 xlsx
+    # ha valori grezzi a 4 decimali che creano false micro-variazioni
+    def p(x): return round(x, 2) if x else None
     voci.append([cod, c26, s, v["d25"], v["um"],
                  p(v["e22m"]), p(v["e22l"]), p(v["e23"]), p(v["e24"]), p(v["e25"]), p(e26)])
 out = {"anni": ["marzo 2022", "luglio 2022 (straord.)", "2023", "2024", "2025", "2026"],
