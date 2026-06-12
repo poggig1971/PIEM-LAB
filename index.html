@@ -289,6 +289,13 @@ const REGIONS = {
     parts:[],
     stats:[["Rilevazioni","6"],["Voci in serie","44.276"],["Serie complete","39.621"]],
   },
+  CMP:{
+    nome:"Raffronto LOM-PIE",
+    titolo:"Raffronto risorse Piemonte ↔ Lombardia 2026",
+    fonte:"Accoppiamento automatico delle componenti delle analisi prezzi Piemonte con le risorse del Prezzario Lombardia — riferimenti indicativi da validare, non sostituiscono la verifica di equivalenza tecnica",
+    parts:[],
+    stats:[["Componenti PIE","8.469"],["Con riferimento LOM","8.465"],["Risorse LOM","20.420"]],
+  },
 };
 const PARTS = {
   A:{label:"Parte 1 · Civile, Urbanizz., Difesa suolo, Agrofor.", short:"Parte 1 · Civile"},
@@ -504,6 +511,7 @@ function hasAnalisi(p,v){
 }
 async function applyFilter(){
   if(S.region==="RAF"){ renderRaffronto(); return; }
+  if(S.region==="CMP"){ renderCmp(); return; }
   const qn=norm(S.q.trim());
   const terms=qn.split(/\s+/).filter(t=>t.length>1);
   const onlyP=$("#onlypriced").checked;
@@ -857,7 +865,7 @@ async function openVoce({p,v},opts={}){
   </div>`;
   if(det&&det.declx) h+=`<div class="sect"><h3>Lavorazione e specifiche tecniche</h3><div class="txt">${esc(det.declx)}</div></div>`;
   if(an){
-    h+=`<div class="sect"><h3>Analisi prezzi <small>scomposizione in risorse elementari</small> <button class="sgbtn" id="sgall">⚑ Segnala anomalia</button>${REGOF[p]==="PIE"&&Object.keys(LOMFIX).length?`<button class="sgbtn" id="fixexp" title="Scarica le correzioni dei riferimenti Lombardia salvate in questo browser">⬇ Correzioni LOM (${Object.keys(LOMFIX).length})</button>`:""}</h3>
+    h+=`<div class="sect"><h3>Analisi prezzi <small>scomposizione in risorse elementari</small> <button class="sgbtn" id="sgall">⚑ Segnala anomalia</button>${REGOF[p]==="PIE"&&Object.keys(LOMFIX).length?`<button class="sgbtn" id="fixexp" title="Scarica le correzioni dei riferimenti Lombardia salvate in questo browser">⬇ Correzioni LOM (${Object.keys(LOMFIX).length})</button>`:""}${REGOF[p]==="PIE"?`<button class="sgbtn" id="cmpb" title="Modulo B: affianca questa analisi a un'analisi del prezzario Lombardia">⇄ Confronta con LOM</button>`:""}</h3>
     <table class="an"><thead><tr><th>Codice risorsa</th><th>Descrizione</th><th>U.M.</th><th class="num">Quantità</th><th class="num">Costo unit. €</th><th class="num">Costo €</th><th class="num">Inc. %</th><th></th></tr></thead><tbody>`;
     let lastCat="";
     const tot=an.tot||v[3];
@@ -962,6 +970,8 @@ async function openVoce({p,v},opts={}){
     const back=PENDFIX.back; PENDFIX=null; VHIST=[];
     if(back) openVoce(back,{back:true}); else closeVoce();
   };
+  const cb=document.getElementById("cmpb");
+  if(cb) cb.onclick=()=>openCompare(p,v);
   const fx=document.getElementById("fixexp");
   if(fx) fx.onclick=()=>{
     let csv="cod_PIE;cod_LOM_corretto\r\n";
@@ -1068,16 +1078,299 @@ $("#csv").onclick=()=>{
   a.click();
 };
 
+/* ---------- Raffronto risorse LOM-PIE (matrice componenti analisi) ---------- */
+const CMP_LABS=["Senza rif. LOM","Δ ≤ −20%","−20 ÷ −5%","±5%","+5 ÷ +20%","Δ > +20%","U.M. diverse","Senza prezzo"];
+let CMP_AFF="T", CMPD=null;
+async function loadCmp(){
+  if(CMPD) return CMPD;
+  const [pl,uso,dP]=await Promise.all([loadPieLom(), loadUso("pie"), loadPart("P")]);
+  const vmap={}; dP.voci.forEach(v=>{vmap[v[0]]=v;});
+  buildPieIdx(dP);
+  const rows=[];
+  for(const cod of Object.keys(uso.uso)){
+    rows.push({cod, s:cod.split(".")[0], v:vmap[cod]||null, c:pl[cod]||null, nu:(uso.uso[cod]||[]).length, xd:(uso.extra||{})[cod]||""});
+  }
+  CMPD={rows,dP};
+  return CMPD;
+}
+function cmpTrimMean(arr){
+  if(!arr.length) return null;
+  const s=[...arr].sort((a,b)=>a-b);
+  const k=Math.floor(s.length*0.05);
+  const t=s.slice(k,s.length-k||s.length);
+  return t.reduce((x,y)=>x+y,0)/t.length;
+}
+function cmpGrpRank(s){ if(/^PR/.test(s)) return "1"; if(/^AT/.test(s)) return "2"; if(/^RU/.test(s)) return "3"; return "4"; }
+function cmpClass(row){
+  const c=row.c&&row.c[0];
+  if(!c) return 0;
+  if(!c[4]) return 6;
+  if(c[2]==null) return 7;
+  const d=c[2];
+  if(d<=-20) return 1;
+  if(d<=-5) return 2;
+  if(d<5) return 3;
+  if(d<20) return 4;
+  return 5;
+}
+function cmpAffOk(row){
+  const c=row.c&&row.c[0];
+  if(!c) return true;
+  if(CMP_AFF==="A") return c[5]==="alta";
+  if(CMP_AFF==="AM") return c[5]!=="bassa";
+  return true;
+}
+async function renderCmp(){
+  $("#rescount").textContent="";
+  $("#crumb").innerHTML=`<b>Raffronto risorse Piemonte ↔ Lombardia 2026</b>`;
+  const el=$("#results");
+  el.innerHTML=`<div class="ld"><span class="spin"></span>Caricamento accoppiamenti…</div>`;
+  try{ await loadCmp(); }
+  catch(e){ el.innerHTML=`<div class="soonbox"><b>Dati di accoppiamento non disponibili.</b></div>`; return; }
+  el.innerHTML=`<div class="rafbar">
+    <div class="fld"><label>Affidabilità accoppiamento</label><select id="cmp-aff">
+      <option value="T"${CMP_AFF==="T"?" selected":""}>tutte</option>
+      <option value="AM"${CMP_AFF==="AM"?" selected":""}>alta + media</option>
+      <option value="A"${CMP_AFF==="A"?" selected":""}>solo alta</option></select></div>
+    <div class="rafhint">Le 8.469 componenti delle analisi prezzi Piemonte sono accoppiate automaticamente alla risorsa più simile del Prezzario Lombardia (riferimenti indicativi, da validare; le correzioni «✓» fatte da te prevalgono e sono evidenziate nell'elenco). Righe = sezioni e famiglie del listino Piemonte; colonne = classi di scostamento del prezzo Lombardia rispetto al Piemonte, a parità di unità di misura. Clic su una cella per l'elenco delle coppie.</div>
+  </div><div id="cmpout"></div>`;
+  $("#cmp-aff").onchange=e=>{ CMP_AFF=e.target.value; updateCmp(); };
+  updateCmp();
+}
+function updateCmp(){
+  const D=CMPD, out=$("#cmpout");
+  const stats={}, tot={c:new Array(8).fill(0),ds:[],n:0};
+  let excl=0;
+  for(const row of D.rows){
+    if(!cmpAffOk(row)){ excl++; continue; }
+    const cls=cmpClass(row);
+    const s=row.s;
+    if(!stats[s]) stats[s]={c:new Array(8).fill(0),ds:[],n:0};
+    stats[s].c[cls]++; tot.c[cls]++; stats[s].n++; tot.n++;
+    if(cls>=1&&cls<=5){ stats[s].ds.push(row.c[0][2]); tot.ds.push(row.c[0][2]); }
+  }
+  const pct=(x,n)=>n?100*x/n:0;
+  const fd=x=>x==null?"—":((x>=0?"+":"")+x.toLocaleString("it-IT",{minimumFractionDigits:1,maximumFractionDigits:1})+"%");
+  let h=`<div class="bluhead" style="margin-top:0"><span>Componenti per sezione × classe di scostamento (% sulle componenti della sezione)${excl?` — escluse ${excl.toLocaleString("it-IT")} per affidabilità`:""}</span></div>
+  <div class="rafwrap"><table class="raf"><thead><tr><th>Sez.</th><th>Sezione / famiglia Piemonte</th>${CMP_LABS.map(l=>`<th>${l}</th>`).join("")}<th>Media Δ (5÷95%)</th><th>Mediana Δ</th><th>Comp.</th></tr></thead><tbody>`;
+  const rowH=(key,nome,st,isTot)=>{
+    let cells="";
+    for(let i=0;i<8;i++){
+      const p=pct(st.c[i],st.n);
+      const alpha=Math.min(0.85,p/55), dark=p>45;
+      cells+=`<td class="cl" data-s="${key}" data-c="${i}" style="background:rgba(37,83,199,${alpha.toFixed(2)});${dark?"color:#fff;":""}" title="${st.c[i]} componenti — clic per l'elenco">${p?p.toLocaleString("it-IT",{maximumFractionDigits:1})+"%":"–"}</td>`;
+    }
+    const media=cmpTrimMean(st.ds);
+    return `<tr${isTot?' class="tot"':''}><td>${esc(key)}</td><td class="sn" title="${esc(nome)}">${esc(nome)}</td>${cells}<td>${fd(media)}</td><td>${fd(rafMedian(st.ds))}</td><td>${st.n.toLocaleString("it-IT")}</td></tr>`;
+  };
+  h+=rowH("TOT","TUTTE LE COMPONENTI",tot,true);
+  for(const s of Object.keys(stats).sort((a,b)=>(cmpGrpRank(a)+a).localeCompare(cmpGrpRank(b)+b))){
+    h+=rowH(s,(D.dP.sez[s]&&D.dP.sez[s].nome)||s,stats[s],false);
+  }
+  h+=`</tbody></table></div>
+  <div style="font-size:11px;color:var(--mut);margin-top:10px">Δ% = (prezzo Lombardia − prezzo Piemonte) / prezzo Piemonte, con prezzo Lombardia ricondotto all'unità di misura piemontese. «U.M. diverse» = il riferimento migliore ha unità non riconducibile. «Senza prezzo» = una delle due voci non è quotata. Le sezioni numeriche (01, 06, …) sono lavorazioni richiamate come componenti dentro altre analisi. Accoppiamento automatico ANCE su dati ufficiali delle Regioni: non sostituisce la verifica di equivalenza tecnica.</div>`;
+  out.innerHTML=h;
+  out.querySelectorAll("td.cl").forEach(td=>td.onclick=()=>cmpList(td.dataset.s,+td.dataset.c));
+}
+async function openAnyLom(cod){
+  for(const pp of ["E","A","C","F"]){
+    const d=await loadPart(pp);
+    const f=d.voci.find(x=>x[0]===cod);
+    if(f){ openVoce({p:pp,v:f}); return true; }
+  }
+  return false;
+}
+async function cmpList(sez,cls){
+  const D=CMPD;
+  const rows=[];
+  for(const row of D.rows){
+    if(sez!=="TOT"&&row.s!==sez) continue;
+    if(!cmpAffOk(row)) continue;
+    if(cmpClass(row)!==cls) continue;
+    rows.push(row);
+    if(rows.length>=600) break;
+  }
+  rows.sort((a,b)=>b.nu-a.nu);
+  const ovl=$("#ovl"), pan=$("#panel");
+  ovl.classList.add("show"); document.body.style.overflow="hidden";
+  const nome=sez==="TOT"?"tutte le sezioni":((D.dP.sez[sez]&&D.dP.sez[sez].nome)||sez);
+  let h=`<div class="phead"><span style="font-weight:700">${esc(CMP_LABS[cls])} — ${esc(nome)}</span>
+    <span style="font-size:12px;opacity:.8;align-self:center">${rows.length>=600?"prime 600 coppie":rows.length+" coppie"} · ordinate per n. analisi PIE che le usano</span>
+    <button class="x" id="cmpclose" style="margin-left:auto">×</button></div>
+  <div class="pbody"><table class="an"><thead><tr><th>Cod. Piemonte</th><th>Descrizione (PIE)</th><th>UM</th><th class="num">€ PIE</th><th class="num">Usi</th><th>Rif. Lombardia</th><th class="num">€ LOM</th><th class="num">Δ%</th><th>Aff.</th></tr></thead><tbody>`;
+  for(const row of rows){
+    const v=row.v, c=row.c&&row.c[0];
+    const fix=LOMFIX[row.cod];
+    const descr=v?v[1]:row.xd, um=v?v[2]:"", pr=v?v[3]:null;
+    const lcod=fix||(c&&c[0])||null;
+    h+=`<tr><td><a href="#" data-cp="P|${esc(row.cod)}">${esc(row.cod)}</a></td>
+      <td>${esc(String(descr).slice(0,120))}</td><td style="white-space:nowrap">${esc(um)}</td>
+      <td class="num">${pr>0?fmt(pr):"—"}</td><td class="num">${row.nu}</td>
+      <td>${lcod?`<a href="#" data-cl="${esc(lcod)}">${esc(lcod)}</a>${fix?' <b style="color:var(--navy)">✓</b>':""}`:"—"}</td>
+      <td class="num">${c&&!fix&&c[1]!=null?fmt(c[1]):"—"}</td>
+      <td class="num">${c&&!fix&&c[2]!=null?(c[2]>0?"+":"")+fmt(c[2],1)+"%":"—"}</td>
+      <td>${fix?"corretto":(c?esc(c[5]):"")}</td></tr>`;
+  }
+  h+=`</tbody></table></div>`;
+  pan.innerHTML=h;
+  document.getElementById("cmpclose").onclick=closeVoce;
+  pan.querySelectorAll("a[data-cp]").forEach(a=>a.onclick=async ev=>{
+    ev.preventDefault();
+    const cod=a.dataset.cp.split("|")[1];
+    const d=await loadPart("P");
+    const f=d.voci.find(x=>x[0]===cod);
+    if(f) openVoce({p:"P",v:f});
+  });
+  pan.querySelectorAll("a[data-cl]").forEach(a=>a.onclick=ev=>{ ev.preventDefault(); openAnyLom(a.dataset.cl); });
+}
+
+/* ---------- Modulo B: analisi affiancate PIE ↔ LOM ---------- */
+async function openCompare(p,v){
+  const det=await getDetail(p,v[0]);
+  const an=det&&det.an;
+  if(!an) return;
+  await loadPieLom();
+  const uso=await loadUso("lom");
+  const score={};
+  for(const r of an.ris){
+    const ref=LOMFIX[r[1]]||(PIELOM[r[1]]&&PIELOM[r[1]][0][0]);
+    if(!ref) continue;
+    for(const l of (uso.uso[ref]||[])) score[l]=(score[l]||0)+1;
+  }
+  await loadPart("A"); await loadPart("C");
+  const findLom=cod=>{ for(const pp of ["A","C"]){ const f=S.data[pp].voci.find(x=>x[0]===cod); if(f) return {p:pp,v:f}; } return null; };
+  const sugg=Object.entries(score).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([cod,n])=>({n,...(findLom(cod)||{})})).filter(x=>x.v);
+  const pan=$("#panel");
+  let h=`<div class="phead"><span class="cod">PIE26_${esc(v[0])}</span>
+    <span style="font-size:12px;opacity:.8;align-self:center">Confronto analisi — scegli l'opera Lombardia</span>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <button class="pact" id="cmpback">← Scheda voce</button>
+      <button class="x" id="cmpclose" style="margin-left:4px">×</button></span></div>
+  <div class="pbody"><div class="ptitle">${esc(v[1])}</div>`;
+  if(sugg.length){
+    h+=`<div class="sect"><h3>Analisi Lombardia suggerite <small>per risorse accoppiate in comune</small></h3><table class="an"><thead><tr><th>Codice</th><th>Denominazione</th><th>UM</th><th class="num">Prezzo €</th><th class="num">Risorse in comune</th></tr></thead><tbody>`;
+    for(const sgt of sugg) h+=`<tr><td><a href="#" data-cmp="${sgt.p}|${esc(sgt.v[0])}">${esc(sgt.v[0])}</a></td><td>${esc(sgt.v[1].slice(0,140))}</td><td>${esc(sgt.v[2]||"")}</td><td class="num">${fmt(sgt.v[3])}</td><td class="num">${sgt.n}</td></tr>`;
+    h+=`</tbody></table></div>`;
+  } else h+=`<div class="sect"><div class="txt">Nessun suggerimento automatico (le componenti di questa analisi non hanno riferimenti usati nelle analisi Lombardia).</div></div>`;
+  h+=`<div class="sect"><h3>Oppure cerca un'opera compiuta Lombardia</h3>
+    <input type="text" id="cmpq" placeholder="Cerca per codice o descrizione…" style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+    <div id="cmpres"></div></div></div>`;
+  pan.innerHTML=h;
+  document.getElementById("cmpclose").onclick=closeVoce;
+  document.getElementById("cmpback").onclick=()=>openVoce({p,v},{back:true});
+  const wire=()=>pan.querySelectorAll("a[data-cmp]").forEach(a=>a.onclick=ev=>{
+    ev.preventDefault();
+    const [lp,lcod]=a.dataset.cmp.split("|");
+    const lv=S.data[lp].voci.find(x=>x[0]===lcod);
+    if(lv) renderCompare({p,v},{p:lp,v:lv});
+  });
+  wire();
+  let deb2=null;
+  document.getElementById("cmpq").addEventListener("input",e=>{
+    clearTimeout(deb2);
+    deb2=setTimeout(()=>{
+      const terms=norm(e.target.value.trim()).split(/\s+/).filter(t=>t.length>1);
+      const res=$("#cmpres");
+      if(!terms.length){ res.innerHTML=""; return; }
+      const out=[];
+      for(const pp of ["A","C"]){
+        for(const lv of S.data[pp].voci){
+          const hay=norm(lv[0])+" "+norm(lv[1]);
+          let ok=true;
+          for(const t of terms){ if(!hay.includes(t)){ok=false;break;} }
+          if(ok){ out.push({p:pp,v:lv}); if(out.length>=30) break; }
+        }
+        if(out.length>=30) break;
+      }
+      res.innerHTML=out.length?`<table class="an"><tbody>`+out.map(x=>`<tr><td><a href="#" data-cmp="${x.p}|${esc(x.v[0])}">${esc(x.v[0])}</a></td><td>${esc(x.v[1].slice(0,130))}</td><td>${esc(x.v[2]||"")}</td><td class="num">${fmt(x.v[3])}</td></tr>`).join("")+`</tbody></table>${out.length>=30?'<div style="font-size:11px;color:var(--mut)">Primi 30 risultati: affina la ricerca.</div>':""}`:`<div class="empty">Nessuna opera trovata.</div>`;
+      wire();
+    },300);
+  });
+}
+async function renderCompare(pv,lv){
+  const pan=$("#panel");
+  pan.innerHTML=`<div class="pbody"><div class="ld"><span class="spin"></span>Caricamento confronto…</div></div>`;
+  const dp=await getDetail("P",pv.v[0]);
+  const dl=await getDetail(lv.p,lv.v[0]);
+  const ap=dp&&dp.an, al=dl&&dl.an;
+  if(!ap||!al){ pan.innerHTML=`<div class="pbody"><div class="soonbox">Analisi non disponibile per una delle due voci.</div></div>`; return; }
+  const totP=ap.tot||pv.v[3], totL=al.tot||lv.v[3];
+  const lmap={}; al.ris.forEach((r,i)=>{ lmap[r[1]]={r,i,used:false}; });
+  const sameUM=norm(pv.v[2]||"")===norm(lv.v[2]||"");
+  let h=`<div class="phead"><span class="cod">PIE26_${esc(pv.v[0])} ⇄ LOM261.${esc(lv.v[0])}</span>
+    <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      <button class="pact" id="cmpback2">← Scegli altra opera</button>
+      <button class="pact" id="cmpprint">Stampa / PDF</button>
+      <button class="x" id="cmpclose" style="margin-left:4px">×</button></span></div>
+  <div class="pbody">
+  <div class="kvgrid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+    <div class="kpi"><div class="k">PIEMONTE — ${esc(pv.v[2]||"")}</div><div style="font-size:12px">${esc(pv.v[1].slice(0,180))}</div><div class="v">${eur(pv.v[3]>0?pv.v[3]:null)}${pv.v[4]>0?` <small>· mano ${fmt(pv.v[4],1)}% (su importo netto)</small>`:""}</div></div>
+    <div class="kpi"><div class="k">LOMBARDIA — ${esc(lv.v[2]||"")}</div><div style="font-size:12px">${esc(lv.v[1].slice(0,180))}</div><div class="v">${eur(lv.v[3]>0?lv.v[3]:null)}${lv.v[4]>0?` <small>· mano ${fmt(lv.v[4],1)}% (sul prezzo)</small>`:""}</div></div>
+  </div>
+  ${sameUM?"":`<div class="soonbox" style="margin-bottom:10px">⚠ Le due lavorazioni hanno unità di misura diverse (${esc(pv.v[2]||"?")} vs ${esc(lv.v[2]||"?")}): le quantità non sono confrontabili direttamente.</div>`}
+  <div class="sect"><h3>Componenti affiancate <small>allineate tramite gli accoppiamenti risorsa</small></h3>
+  <table class="an"><thead>
+    <tr><th colspan="5" style="border-right:2px solid var(--navy)">PIEMONTE — per 1 ${esc(pv.v[2]||"")}</th><th colspan="4">LOMBARDIA — per 1 ${esc(lv.v[2]||"")}</th></tr>
+    <tr><th>Risorsa</th><th>Descrizione</th><th class="num">Qta</th><th class="num">€ unit.</th><th class="num" style="border-right:2px solid var(--navy)">Inc.%</th><th>Risorsa</th><th class="num">Qta</th><th class="num">€ unit.</th><th class="num">Inc.%</th></tr></thead><tbody>`;
+  const num2=x=>{ const n=parseFloat(x); return isNaN(n)?null:n; };
+  for(const r of ap.ris){
+    const refs=[LOMFIX[r[1]], ...(PIELOM[r[1]]||[]).map(c=>c[0])].filter(Boolean);
+    let hit=null;
+    for(const ref of refs){ if(lmap[ref]&&!lmap[ref].used){ hit=lmap[ref]; break; } }
+    if(hit) hit.used=true;
+    const incP=totP?100*num2(r[6])/totP:null;
+    let right=`<td colspan="4" style="color:var(--mut)">— nessuna componente accoppiata —</td>`;
+    if(hit){
+      const lr=hit.r;
+      const incL=totL?100*num2(lr[6])/totL:null;
+      const qcmp=sameUM&&norm(r[3])===norm(String(lr[3]).replace(/^1\s+/,""))&&num2(r[4])&&num2(lr[4]);
+      const ratio=qcmp?num2(lr[4])/num2(r[4]):null;
+      const warn=ratio&&(ratio>1.25||ratio<0.8);
+      right=`<td><a href="#" data-cl="${esc(lr[1])}" title="${esc(String(lr[2]).slice(0,160))}">${esc(lr[1])}</a>${LOMFIX[r[1]]===lr[1]?' <b style="color:var(--navy)">✓</b>':""}</td>
+        <td class="num"${warn?' style="background:var(--amber-bg);font-weight:700"':""} ${ratio?`title="LOM usa ${fmt(ratio,2)}× la quantità PIE"`:""}>${fmt(num2(lr[4]),3)}</td>
+        <td class="num">${fmt(num2(lr[5]))}</td><td class="num">${incL!=null?fmt(incL,1)+"%":"—"}</td>`;
+    }
+    h+=`<tr><td><a href="#" data-cp2="${esc(r[1])}">${esc(r[1])}</a></td><td>${esc(String(r[2]).slice(0,90))} <small style="color:var(--mut)">${esc(r[3])}</small></td>
+      <td class="num">${fmt(num2(r[4]),3)}</td><td class="num">${fmt(num2(r[5]))}</td><td class="num" style="border-right:2px solid var(--navy)">${incP!=null?fmt(incP,1)+"%":"—"}</td>${right}</tr>`;
+  }
+  const rest=al.ris.filter(r=>!lmap[r[1]].used);
+  if(rest.length){
+    h+=`<tr class="cat"><td colspan="9">Componenti presenti solo nell'analisi Lombardia</td></tr>`;
+    for(const lr of rest){
+      const incL=totL?100*num2(lr[6])/totL:null;
+      h+=`<tr><td colspan="5" style="border-right:2px solid var(--navy)"></td><td><a href="#" data-cl="${esc(lr[1])}" title="${esc(String(lr[2]).slice(0,160))}">${esc(lr[1])}</a> <small style="color:var(--mut)">${esc(String(lr[2]).slice(0,70))}</small></td>
+        <td class="num">${fmt(num2(lr[4]),3)}</td><td class="num">${fmt(num2(lr[5]))}</td><td class="num">${incL!=null?fmt(incL,1)+"%":"—"}</td></tr>`;
+    }
+  }
+  const frow=(lab,a,b)=>`<tr class="foot"><td colspan="3">${lab}</td><td class="num">${fmt(a)}</td><td style="border-right:2px solid var(--navy)"></td><td colspan="2"></td><td class="num">${fmt(b)}</td><td></td></tr>`;
+  h+=frow("Sommano (A)",ap.som,al.som)+frow("Spese generali (B)",ap.sg,al.sg)+frow("Utili di impresa (C)",ap.ui,al.ui);
+  h+=`<tr class="tot"><td colspan="3">PREZZO TOTALE</td><td class="num">${fmt(ap.tot)}</td><td style="border-right:2px solid #fff"></td><td colspan="2"></td><td class="num">${fmt(al.tot)}</td><td></td></tr>`;
+  h+=`</tbody></table></div>
+  <div style="font-size:11px;color:var(--mut)">Le quantità evidenziate in ambra differiscono di oltre il 25% a parità di unità (componente e lavorazione). L'incidenza % è calcolata sul prezzo totale dell'analisi di ciascuna Regione. L'allineamento usa gli accoppiamenti automatici e le tue correzioni (✓): verifica sempre l'equivalenza tecnica delle voci.</div></div>`;
+  pan.innerHTML=h;
+  document.getElementById("cmpclose").onclick=closeVoce;
+  document.getElementById("cmpback2").onclick=()=>openCompare(pv.p,pv.v);
+  const cp=document.getElementById("cmpprint");
+  if(cp) cp.onclick=()=>{ document.body.classList.add("printing"); setTimeout(()=>window.print(),50); };
+  pan.querySelectorAll("a[data-cl]").forEach(a=>a.onclick=ev=>{ ev.preventDefault(); openAnyLom(a.dataset.cl); });
+  pan.querySelectorAll("a[data-cp2]").forEach(a=>a.onclick=async ev=>{
+    ev.preventDefault();
+    const d=await loadPart("P");
+    const f=d.voci.find(x=>x[0]===a.dataset.cp2);
+    if(f) openVoce({p:"P",v:f});
+  });
+}
+
 /* ---------- regioni, tab e avvio ---------- */
 function renderRegions(){
   const el=$("#regions"); el.innerHTML="";
   for(const [r,info] of Object.entries(REGIONS)){
     const b=document.createElement("button");
     b.className="reg"+(r===S.region?" active":"");
-    b.innerHTML=esc(info.nome)+(r==="RAF"?'<span class="soon">storico PIE</span>':"");
+    b.innerHTML=esc(info.nome)+(r==="RAF"?'<span class="soon">storico PIE</span>':"")+(r==="CMP"?'<span class="soon">risorse</span>':"");
     b.onclick=async()=>{ S.region=r; S.path=null; S.sort=null; S.q=""; $("#q").value="";
       renderRegions(); renderHeader(); renderTabs(); showLoading();
-      if(r==="RAF"){ $("#tree").innerHTML=""; renderRaffronto(); return; }
+      if(r==="RAF"||r==="CMP"){ $("#tree").innerHTML=""; if(r==="RAF") renderRaffronto(); else renderCmp(); return; }
       await loadPart(curPart()); renderTree(); applyFilter(); renderTabs(); };
     el.appendChild(b);
   }
