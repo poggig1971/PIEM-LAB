@@ -160,6 +160,24 @@ label.chk:hover{background:var(--bg)}
 label.chk:has(input:checked){border-color:var(--navy);background:#eef2fb;font-weight:600}
 label.chk input{width:auto;accent-color:var(--navy)}
 @media(max-width:560px){.chks{grid-template-columns:1fr}}
+.rafbar{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px}
+.rafbar .fld label{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);display:block;margin-bottom:4px}
+.rafbar select{padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;background:#fff;color:var(--txt)}
+.rafhint{font-size:11.5px;color:var(--mut);max-width:520px;line-height:1.5}
+.rafdist{display:flex;gap:6px;align-items:flex-end;height:110px;margin:8px 0 2px;background:#fff;border:1px solid var(--border);border-radius:10px 10px 0 0;padding:12px 12px 0}
+.rafdist .bcol{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.rafdist .bval{font-size:9px;color:var(--navy);font-weight:700}
+.rafdist .bar{width:70%;background:var(--navy);border-radius:3px 3px 0 0;min-height:1px}
+.rafdist-lab{display:flex;gap:6px;font-size:8.5px;color:var(--mut);text-align:center;background:#fff;border:1px solid var(--border);border-top:none;border-radius:0 0 10px 10px;padding:4px 12px 8px;margin-bottom:14px}
+.rafdist-lab span{flex:1;line-height:1.2}
+.rafwrap{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 1px 3px rgba(21,41,94,.08)}
+table.raf{width:100%;border-collapse:collapse;font-size:11px}
+table.raf th{background:var(--navy);color:#fff;padding:7px 5px;font-size:9.5px;text-align:center;white-space:normal;line-height:1.2}
+table.raf td{border:1px solid #e9edf5;padding:4px 5px;text-align:center;white-space:nowrap;font-variant-numeric:tabular-nums}
+table.raf td.sn{text-align:left;max-width:230px;overflow:hidden;text-overflow:ellipsis}
+table.raf tr.tot td{font-weight:700;background:#eef2fb}
+table.raf td.cl{cursor:pointer}
+table.raf td.cl:hover{outline:2px solid var(--blue);outline-offset:-2px}
 .ld{padding:30px;text-align:center;color:var(--mut)}
 .spin{display:inline-block;width:18px;height:18px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:sp 1s linear infinite;vertical-align:middle;margin-right:8px}
 @keyframes sp{to{transform:rotate(360deg)}}
@@ -264,10 +282,10 @@ const REGIONS = {
   },
   RAF:{
     nome:"Raffronto",
-    titolo:"Raffronto Piemonte · Lombardia",
-    fonte:"Confronto tra prezzi e analisi dei due prezzari regionali",
+    titolo:"Raffronto storico Prezzario Piemonte",
+    fonte:"Confronto tra le edizioni: marzo 2022 · luglio 2022 (straordinaria caro-materiali) · 2023 · 2024 · 2025 · 2026 — serie ricostruita con transcodifiche ufficiali",
     parts:[],
-    stats:[],
+    stats:[["Rilevazioni","6"],["Voci in serie","44.276"],["Serie complete","39.621"]],
   },
 };
 const PARTS = {
@@ -596,12 +614,149 @@ function crumb(){
   const b=$("#cclr"); if(b) b.onclick=()=>{S.path=null;S.pieSez=null;S.pieFam=null;document.querySelectorAll(".tnode.sel").forEach(x=>x.classList.remove("sel"));renderTree();renderCapBar();applyFilter();};
 }
 function showLoading(){ $("#results").innerHTML=`<div class="ld"><span class="spin"></span>Caricamento dati…</div>`; }
-function renderRaffronto(){
+
+/* ---------- raffronto storico Piemonte ---------- */
+let STO=null;
+async function loadStorico(){
+  if(!STO){ const r=await fetch("data/storico_pie.json"); STO=await r.json(); }
+  return STO;
+}
+const RAF_LABS=["Cancellato","Riduzione >50%","Riduzione 30–50%","Riduzione 10–30%","Riduzione <10%","Invariato","Aumento <5%","Aumento 5–15%","Aumento 15–30%","Aumento 30–50%","Aumento 50–150%","Aumento >150%","Nuovo prezzo"];
+function rafClassify(pa,pb){
+  const a=pa!=null&&pa>0, b=pb!=null&&pb>0;
+  if(a&&!b) return 0;
+  if(!a&&b) return 12;
+  if(!a&&!b) return -1;
+  const d=(pb-pa)/pa;
+  if(d===0) return 5;
+  if(d<=-0.5) return 1;
+  if(d<=-0.3) return 2;
+  if(d<=-0.1) return 3;
+  if(d<0) return 4;
+  if(d<0.05) return 6;
+  if(d<0.15) return 7;
+  if(d<0.3) return 8;
+  if(d<0.5) return 9;
+  if(d<1.5) return 10;
+  return 11;
+}
+if(S.rafA===undefined){ S.rafA=4; S.rafB=5; }
+async function renderRaffronto(){
   $("#rescount").textContent="";
-  $("#crumb").innerHTML=`<b>Raffronto Piemonte · Lombardia</b>`;
-  $("#results").innerHTML=`<div class="soonbox"><b>Scheda di raffronto in preparazione.</b><br>
-  Confronto tra prezzi e analisi delle voci corrispondenti dei prezzari Piemonte e Lombardia 2026:<br>
-  correlazione tra le voci, scostamenti di prezzo, differenze nelle risorse e nei costi elementari.</div>`;
+  $("#crumb").innerHTML=`<b>Raffronto storico Prezzario Piemonte</b>`;
+  const el=$("#results");
+  el.innerHTML=`<div class="ld"><span class="spin"></span>Caricamento serie storica…</div>`;
+  let d;
+  try{ d=await loadStorico(); }
+  catch(e){ el.innerHTML=`<div class="soonbox"><b>Serie storica non disponibile.</b><br>Il file dati del raffronto non è ancora stato pubblicato.</div>`; return; }
+  const opts=i=>d.anni.map((a,j)=>`<option value="${j}"${j===i?" selected":""}>${esc(a)}</option>`).join("");
+  el.innerHTML=`<div class="rafbar">
+    <div class="fld"><label>Edizione di partenza</label><select id="raf-a">${opts(S.rafA)}</select></div>
+    <div class="fld"><label>Edizione di confronto</label><select id="raf-b">${opts(S.rafB)}</select></div>
+    <div class="rafhint">Distribuzione delle voci per classe di variazione e matrice per sezione. Cliccando una cella della matrice si apre l'elenco delle voci di quella sezione e classe. Media, mediana e Δ ponderata sono calcolate sulle voci presenti in entrambe le edizioni.</div>
+  </div><div id="rafout"></div>`;
+  $("#raf-a").onchange=e=>{ S.rafA=+e.target.value; updateRaf(); };
+  $("#raf-b").onchange=e=>{ S.rafB=+e.target.value; updateRaf(); };
+  updateRaf();
+}
+function rafMedian(arr){
+  if(!arr.length) return null;
+  const s=[...arr].sort((x,y)=>x-y);
+  const m=Math.floor(s.length/2);
+  return s.length%2?s[m]:(s[m-1]+s[m])/2;
+}
+async function updateRaf(){
+  const d=await loadStorico();
+  const A=5+S.rafA, B=5+S.rafB;
+  const out=$("#rafout");
+  if(S.rafA===S.rafB){ out.innerHTML=`<div class="soonbox">Selezionare due edizioni diverse.</div>`; return; }
+  const stats={};
+  const tot={c:new Array(13).fill(0), ds:[], sa:0, sb:0, n:0};
+  for(const v of d.voci){
+    const cls=rafClassify(v[A], v[B]);
+    if(cls<0) continue;
+    const s=v[2];
+    if(!stats[s]) stats[s]={c:new Array(13).fill(0), ds:[], sa:0, sb:0, n:0};
+    stats[s].c[cls]++; tot.c[cls]++;
+    stats[s].n++; tot.n++;
+    if(cls>0&&cls<12){
+      const dd=(v[B]-v[A])/v[A];
+      stats[s].ds.push(dd); tot.ds.push(dd);
+      stats[s].sa+=v[A]; stats[s].sb+=v[B];
+      tot.sa+=v[A]; tot.sb+=v[B];
+    }
+  }
+  const pct=(x,n)=>n?100*x/n:0;
+  const fp=x=>x==null?"—":((x>=0?"+":"")+(100*x).toLocaleString("it-IT",{minimumFractionDigits:1,maximumFractionDigits:1})+"%");
+  // distribuzione complessiva a barre
+  const mx=Math.max(...tot.c.map(x=>pct(x,tot.n)),1);
+  let h=`<div class="bluhead" style="margin-top:0"><span>Distribuzione delle voci per classe di variazione — ${esc(d.anni[S.rafA])} → ${esc(d.anni[S.rafB])}</span></div>
+  <div class="rafdist">`+tot.c.map(x=>{
+    const p=pct(x,tot.n);
+    return `<div class="bcol"><span class="bval">${p>=0.1?p.toLocaleString("it-IT",{maximumFractionDigits:1})+"%":""}</span><div class="bar" style="height:${Math.max(1,80*p/mx)}px"></div></div>`;
+  }).join("")+`</div><div class="rafdist-lab">`+RAF_LABS.map(l=>`<span>${l}</span>`).join("")+`</div>`;
+  // matrice per sezione
+  h+=`<div class="bluhead"><span>Scostamenti per sezione × classe di variazione (% sulle voci della sezione)</span></div><div class="rafwrap"><table class="raf"><thead><tr>
+    <th>Sez.</th><th>Sezione</th>${RAF_LABS.map(l=>`<th>${l}</th>`).join("")}<th>Media Δ</th><th>Mediana Δ</th><th>Δ pond.</th><th>Voci</th></tr></thead><tbody>`;
+  const rowH=(key,nome,st,isTot)=>{
+    let cells="";
+    for(let i=0;i<13;i++){
+      const p=pct(st.c[i],st.n);
+      const alpha=Math.min(0.85,p/55);
+      const dark=p>45;
+      cells+=`<td class="cl" data-s="${key}" data-c="${i}" style="background:rgba(37,83,199,${alpha.toFixed(2)});${dark?"color:#fff;":""}" title="${st.c[i]} voci — clic per l'elenco">${p?p.toLocaleString("it-IT",{maximumFractionDigits:1})+"%":"–"}</td>`;
+    }
+    const media=st.ds.length?st.ds.reduce((x,y)=>x+y,0)/st.ds.length:null;
+    const pond=st.sa?(st.sb-st.sa)/st.sa:null;
+    return `<tr${isTot?' class="tot"':''}><td>${esc(key)}</td><td class="sn" title="${esc(nome)}">${esc(nome)}</td>${cells}
+      <td>${fp(media)}</td><td>${fp(rafMedian(st.ds))}</td><td>${fp(pond)}</td><td>${st.n.toLocaleString("it-IT")}</td></tr>`;
+  };
+  h+=rowH("TOT","TUTTE LE SEZIONI",tot,true);
+  for(const s of Object.keys(stats).sort()){
+    h+=rowH(s, d.sez[s]||s, stats[s], false);
+  }
+  h+=`</tbody></table></div>
+  <div style="font-size:11px;color:var(--mut);margin-top:10px">Classi: Invariato = prezzo identico; Cancellato = presente in ${esc(d.anni[S.rafA])} ma non in ${esc(d.anni[S.rafB])}; Nuovo prezzo = viceversa. Fonte: serie storica ANCE su prezzari ufficiali Regione Piemonte e transcodifiche regionali.</div>`;
+  out.innerHTML=h;
+  out.querySelectorAll("td.cl").forEach(td=>td.onclick=()=>rafList(td.dataset.s, +td.dataset.c));
+}
+async function rafList(sez, cls){
+  const d=await loadStorico();
+  const A=5+S.rafA, B=5+S.rafB;
+  const rows=[];
+  for(const v of d.voci){
+    if(sez!=="TOT" && v[2]!==sez) continue;
+    if(rafClassify(v[A], v[B])!==cls) continue;
+    rows.push(v);
+    if(rows.length>=600) break;
+  }
+  const ovl=$("#ovl"), pan=$("#panel");
+  ovl.classList.add("show");
+  document.body.style.overflow="hidden";
+  const nome=sez==="TOT"?"tutte le sezioni":(d.sez[sez]||sez);
+  let h=`<div class="phead"><span style="font-weight:700">${esc(RAF_LABS[cls])} — ${esc(nome)}</span>
+    <span style="font-size:12px;opacity:.8;align-self:center">${esc(d.anni[S.rafA])} → ${esc(d.anni[S.rafB])}${rows.length>=600?" · prime 600 voci":""}</span>
+    <button class="x" id="pclose2" style="margin-left:auto">×</button></div>
+  <div class="pbody"><table class="an"><thead><tr><th>Codice</th><th>Descrizione</th><th>UM</th>
+    <th class="num">${esc(d.anni[S.rafA])}</th><th class="num">${esc(d.anni[S.rafB])}</th><th class="num">Δ%</th></tr></thead><tbody>`;
+  for(const v of rows){
+    const dd=(v[A]&&v[B])?100*(v[B]-v[A])/v[A]:null;
+    const cod=v[1]||v[0];
+    const link=v[1]?`<a href="#" data-r26="${esc(v[1])}" style="font-family:Consolas,monospace;font-size:11px">${esc(cod)}</a>`:`<span style="font-family:Consolas,monospace;font-size:11px">${esc(cod)}</span>`;
+    h+=`<tr><td>${link}</td><td>${esc(v[3])}</td><td>${esc(v[4]||"")}</td>
+      <td class="num">${v[A]!=null?fmt(v[A]):"—"}</td><td class="num">${v[B]!=null?fmt(v[B]):"—"}</td>
+      <td class="num">${dd!=null?(dd>=0?"+":"")+fmt(dd,1)+"%":"—"}</td></tr>`;
+  }
+  h+=`</tbody></table>
+  <div style="font-size:11px;color:var(--mut);margin-top:8px">I codici cliccabili aprono la scheda della voce nell'edizione 2026 (con analisi, dove disponibile).</div></div>`;
+  pan.innerHTML=h;
+  const pc=document.getElementById("pclose2"); if(pc) pc.onclick=closeVoce;
+  pan.querySelectorAll("a[data-r26]").forEach(a=>a.onclick=async ev=>{
+    ev.preventDefault();
+    const dP=await loadPart("P");
+    const found=dP.voci.find(x=>x[0]===a.dataset.r26);
+    if(found) openVoce({p:"P",v:found});
+  });
 }
 
 /* ---------- dettaglio voce ---------- */
@@ -817,7 +972,7 @@ function renderRegions(){
   for(const [r,info] of Object.entries(REGIONS)){
     const b=document.createElement("button");
     b.className="reg"+(r===S.region?" active":"");
-    b.innerHTML=esc(info.nome)+(r==="RAF"?'<span class="soon">in preparazione</span>':"");
+    b.innerHTML=esc(info.nome)+(r==="RAF"?'<span class="soon">storico PIE</span>':"");
     b.onclick=async()=>{ S.region=r; S.path=null; S.sort=null; S.q=""; $("#q").value="";
       renderRegions(); renderHeader(); renderTabs(); showLoading();
       if(r==="RAF"){ $("#tree").innerHTML=""; renderRaffronto(); return; }
