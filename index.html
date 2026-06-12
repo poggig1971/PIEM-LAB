@@ -718,7 +718,7 @@ async function updateRaf(){
     h+=rowH(s, d.sez[s]||s, stats[s], false);
   }
   h+=`</tbody></table></div>
-  <div style="font-size:11px;color:var(--mut);margin-top:10px">Classi: Invariato = prezzo identico; Cancellato = presente in ${esc(d.anni[S.rafA])} ma non in ${esc(d.anni[S.rafB])}; Nuovo prezzo = viceversa. Fonte: serie storica ANCE su prezzari ufficiali Regione Piemonte e transcodifiche regionali.</div>`;
+  <div style="font-size:11px;color:var(--mut);margin-top:10px">Le sezioni sono quelle della classificazione 2025: le voci ricollocate nell'edizione 2026 (es. sez. 25 «Grande viabilità» → sez. 33, PR e AT) sono seguite nei nuovi codici tramite la transcodifica ufficiale regionale, quindi una sezione può mostrare variazioni anche se non esiste più nella struttura 2026; nel dettaglio è riportato il codice 2026. Classi: Invariato = prezzo identico; Cancellato = presente in ${esc(d.anni[S.rafA])} ma non in ${esc(d.anni[S.rafB])}; Nuovo prezzo = viceversa. Fonte: serie storica ANCE su prezzari ufficiali Regione Piemonte e transcodifiche regionali.</div>`;
   out.innerHTML=h;
   out.querySelectorAll("td.cl").forEach(td=>td.onclick=()=>rafList(td.dataset.s, +td.dataset.c));
 }
@@ -763,6 +763,23 @@ async function rafList(sez, cls){
 
 /* ---------- riferimenti LOM per le componenti delle analisi PIE (matching automatico, da validare). ---------- */
 let PIELOM=null;
+let VHIST=[],CURV=null,PENDFIX=null;
+let LOMFIX={};
+try{ LOMFIX=JSON.parse(localStorage.getItem("pie_lom_fix")||"{}"); }catch(e){}
+function saveFix(){ try{ localStorage.setItem("pie_lom_fix",JSON.stringify(LOMFIX)); }catch(e){} }
+function lomKeywords(d){
+  const stop=new Set(["nella","nelle","della","delle","dello","degli","con","per","tipo","norma","conforme","compreso","compresa","secondo","dato","opera","classe","comuni","esecuzione"]);
+  return String(d).split(/[^A-Za-zÀ-ù0-9]+/).filter(w=>w.length>=5&&!stop.has(w.toLowerCase())).slice(0,3)
+    .map(w=>{w=w.toLowerCase();if("aeiou".includes(w[w.length-1]))w=w.slice(0,-1);return w.slice(0,7);}).join(" ");
+}
+async function searchLomRis(q){
+  closeVoce();
+  S.region="LOM"; S.part.LOM="E"; S.path=null; S.sort=null; S.q=q;
+  renderRegions(); renderHeader(); showLoading();
+  await loadPart("E");
+  $("#q").value=q;
+  renderTabs(); applyFilter();
+}
 async function loadPieLom(){
   if(PIELOM) return PIELOM;
   try{ const r=await fetch("data/pie_lom_ris.json"); PIELOM=await r.json(); }
@@ -780,7 +797,11 @@ async function getDetail(p,cod){
   }
   return S.det[key][cod]||null;
 }
-async function openVoce({p,v}){
+async function openVoce({p,v},opts={}){
+  if(opts.back){}
+  else if(opts.push){ if(CURV) VHIST.push(CURV); }
+  else { VHIST=[]; if(p==="P") PENDFIX=null; }
+  CURV={p,v};
   const reg=REGIONS[REGOF[p]];
   const ovl=$("#ovl"),pan=$("#panel");
   ovl.classList.add("show");
@@ -795,6 +816,8 @@ async function openVoce({p,v}){
     <span class="cod">${esc(reg.pfx)}${esc(v[0])}</span>
     <span style="font-size:12px;opacity:.8;align-self:center">${esc(reg.nome)} 2026</span>
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
+      ${VHIST.length?`<button class="pact" id="pback">← Torna</button>`:""}
+      ${(PENDFIX&&REGOF[p]==="LOM")?`<button class="pact" id="pusefix" style="background:var(--amber-bg);border-color:var(--amber);color:var(--amber)">✓ Usa come rif. per ${esc(PENDFIX.pie)}</button>`:""}
       <button class="pact" id="pfav">${favs.has(fk)?"★ Preferita":"☆ Preferita"}</button>
       <button class="pact" id="pprint">Stampa / PDF</button>
       <button class="pact" id="plink">Copia link</button>
@@ -814,7 +837,7 @@ async function openVoce({p,v}){
   </div>`;
   if(det&&det.declx) h+=`<div class="sect"><h3>Lavorazione e specifiche tecniche</h3><div class="txt">${esc(det.declx)}</div></div>`;
   if(an){
-    h+=`<div class="sect"><h3>Analisi prezzi <small>scomposizione in risorse elementari</small> <button class="sgbtn" id="sgall">⚑ Segnala anomalia</button></h3>
+    h+=`<div class="sect"><h3>Analisi prezzi <small>scomposizione in risorse elementari</small> <button class="sgbtn" id="sgall">⚑ Segnala anomalia</button>${REGOF[p]==="PIE"&&Object.keys(LOMFIX).length?`<button class="sgbtn" id="fixexp" title="Scarica le correzioni dei riferimenti Lombardia salvate in questo browser">⬇ Correzioni LOM (${Object.keys(LOMFIX).length})</button>`:""}</h3>
     <table class="an"><thead><tr><th>Codice risorsa</th><th>Descrizione</th><th>U.M.</th><th class="num">Quantità</th><th class="num">Costo unit. €</th><th class="num">Costo €</th><th class="num">Inc. %</th><th></th></tr></thead><tbody>`;
     let lastCat="";
     const tot=an.tot||v[3];
@@ -826,8 +849,20 @@ async function openVoce({p,v}){
         <td class="num">${fmt(r[4],3)}</td><td class="num">${fmt(r[5])}</td><td class="num">${fmt(r[6])}</td>
         <td class="num">${inc!=null?fmt(inc,1)+"%":"—"}</td>
         <td><button class="flag" data-ri="${ri}" title="Segnala anomalia su questa risorsa (descrizione, quantità, costi)">⚑ Segnala</button></td></tr>`;
-      const m=(REGOF[p]==="PIE"&&PIELOM)?PIELOM[r[1]]:null;
-      if(m) h+=`<tr class="lomref"><td></td><td colspan="7">≈ Rif. Lombardia 2026: <a href="#" data-lcod="${esc(m[0])}">${esc(m[0])}</a> — ${eur(m[1])}${m[4]?` / ${esc(r[3])}`:""}${m[2]!=null?` (Δ ${m[2]>0?"+":""}${fmt(m[2],1)}% su PIE)`:""}${m[3]?` · usata in ${m[3]} analisi LOM`:" · non usata nelle analisi LOM"}${m[4]?"":" · U.M. diverse"} · accoppiamento automatico: affidabilità ${esc(m[5])}${m[5]==="bassa"?" (da verificare)":""}</td></tr>`;
+      const ml=(REGOF[p]==="PIE"&&PIELOM)?PIELOM[r[1]]:null;
+      const fix=(REGOF[p]==="PIE"&&LOMFIX)?LOMFIX[r[1]]:null;
+      if(fix||ml){
+        let ih=`≈ Rif. Lombardia 2026: `;
+        if(fix){
+          ih+=`<a href="#" data-lcod="${esc(fix)}" data-lpie="${esc(r[1])}">${esc(fix)}</a> <b style="color:var(--navy)">✓ scelto da te</b> · <a href="#" data-unfix="${esc(r[1])}">ripristina automatico</a>`;
+        }else{
+          const m=ml[0];
+          ih+=`<a href="#" data-lcod="${esc(m[0])}" data-lpie="${esc(r[1])}">${esc(m[0])}</a> — ${eur(m[1])}${m[4]?` / ${esc(r[3])}`:""}${m[2]!=null?` (Δ ${m[2]>0?"+":""}${fmt(m[2],1)}% su PIE)`:""}${m[3]?` · usata in ${m[3]} analisi LOM`:" · non usata nelle analisi LOM"}${m[4]?"":" · U.M. diverse"} · affidabilità ${esc(m[5])}`;
+          if(ml.length>1) ih+=` · alternative: `+ml.slice(1).map(c=>`<a href="#" data-lcod="${esc(c[0])}" data-lpie="${esc(r[1])}">${esc(c[0])}</a>${c[2]!=null?` (Δ ${c[2]>0?"+":""}${fmt(c[2],1)}%)`:""}`).join(" · ");
+        }
+        ih+=` · <a href="#" data-lq="${esc(lomKeywords(r[2]))}" data-lpie="${esc(r[1])}">🔍 cerca altro riferimento</a>`;
+        h+=`<tr class="lomref"><td></td><td colspan="7">${ih}</td></tr>`;
+      }
     });
     h+=`<tr class="foot"><td colspan="5">Sommano (A)</td><td class="num">${fmt(an.som)}</td><td></td><td></td></tr>
         <tr class="foot"><td colspan="5">Spese generali (B)${an.som?` — ${fmt(100*an.sg/an.som,1)}%`:""}</td><td class="num">${fmt(an.sg)}</td><td></td><td></td></tr>
@@ -884,15 +919,42 @@ async function openVoce({p,v}){
   });
   pan.querySelectorAll("a[data-lcod]").forEach(a=>a.onclick=async ev=>{
     ev.preventDefault();
+    if(a.dataset.lpie) PENDFIX={pie:a.dataset.lpie,back:{p,v}};
     const d=await loadPart("E");
     const found=d.voci.find(x=>x[0]===a.dataset.lcod);
-    if(found) openVoce({p:"E",v:found});
+    if(found) openVoce({p:"E",v:found},{push:true});
   });
+  pan.querySelectorAll("a[data-unfix]").forEach(a=>a.onclick=ev=>{
+    ev.preventDefault();
+    delete LOMFIX[a.dataset.unfix]; saveFix();
+    openVoce({p,v},{back:true});
+  });
+  pan.querySelectorAll("a[data-lq]").forEach(a=>a.onclick=ev=>{
+    ev.preventDefault();
+    PENDFIX={pie:a.dataset.lpie,back:{p,v}};
+    searchLomRis(a.dataset.lq);
+  });
+  const pb=document.getElementById("pback");
+  if(pb) pb.onclick=()=>{ const prev=VHIST.pop(); if(prev) openVoce(prev,{back:true}); };
+  const pu=document.getElementById("pusefix");
+  if(pu&&PENDFIX) pu.onclick=()=>{
+    LOMFIX[PENDFIX.pie]=v[0]; saveFix();
+    const back=PENDFIX.back; PENDFIX=null; VHIST=[];
+    if(back) openVoce(back,{back:true}); else closeVoce();
+  };
+  const fx=document.getElementById("fixexp");
+  if(fx) fx.onclick=()=>{
+    let csv="cod_PIE;cod_LOM_corretto\r\n";
+    for(const [ka,kb] of Object.entries(LOMFIX)) csv+=ka+";"+kb+"\r\n";
+    const u=URL.createObjectURL(new Blob(["﻿"+csv],{type:"text/csv"}));
+    const dl=document.createElement("a"); dl.href=u; dl.download="correzioni_rif_LOM.csv"; dl.click();
+    setTimeout(()=>URL.revokeObjectURL(u),2000);
+  };
   const sa=document.getElementById("sgall");
   if(sa) sa.onclick=()=>openSegnala(p,v,null);
   if(an) pan.querySelectorAll("button.flag").forEach(b=>b.onclick=()=>openSegnala(p,v,an.ris[+b.dataset.ri]));
 }
-function closeVoce(){ $("#ovl").classList.remove("show"); document.body.style.overflow=""; }
+function closeVoce(){ $("#ovl").classList.remove("show"); document.body.style.overflow=""; VHIST=[]; CURV=null; }
 $("#ovl").addEventListener("click",e=>{ if(e.target.id==="ovl") closeVoce(); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape"){ if($("#ovl2").classList.contains("show")) closeSegnala(); else closeVoce(); } });
 
