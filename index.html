@@ -1259,7 +1259,7 @@ async function cmpList(sez,cls){
   let h=`<div class="phead"><span style="font-weight:700">${esc(CMP_LABS[cls])} — ${esc(nome)}</span>
     <span style="font-size:12px;opacity:.8;align-self:center">${rows.length>=600?"prime 600 coppie":rows.length+" coppie"} · ordinate per n. analisi PIE che le usano</span>
     <button class="x" id="cmpclose" style="margin-left:auto">×</button></div>
-  <div class="pbody"><table class="an"><thead><tr><th>Cod. Piemonte</th><th>Descrizione (PIE)</th><th>UM</th><th class="num">€ PIE</th><th class="num">Usi</th><th>Rif. Lombardia</th><th class="num">€ LOM</th><th class="num">Δ%</th><th>Aff.</th></tr></thead><tbody>`;
+  <div class="pbody"><table class="an"><thead><tr><th>Cod. Piemonte</th><th>Descrizione (PIE)</th><th>UM</th><th class="num">€ PIE</th><th class="num">Usi</th><th>Rif. Lombardia</th><th class="num">€ LOM</th><th class="num">Δ%</th><th>Aff.</th><th></th></tr></thead><tbody>`;
   for(const row of rows){
     const v=row.v, c=row.c&&row.c[0];
     const fix=LOMFIX[row.cod];
@@ -1271,7 +1271,8 @@ async function cmpList(sez,cls){
       <td>${lcod?`<a href="#" data-cl="${esc(lcod)}">${esc(lcod)}</a>${fix?' <b style="color:var(--navy)">✓</b>':""}`:"—"}</td>
       <td class="num">${c&&!fix&&c[1]!=null?fmt(c[1]):"—"}</td>
       <td class="num">${c&&!fix&&c[2]!=null?(c[2]>0?"+":"")+fmt(c[2],1)+"%":"—"}</td>
-      <td>${fix?"corretto":(c?esc(c[5]):"")}</td></tr>`;
+      <td>${fix?"corretto":(c?esc(c[5]):"")}</td>
+      <td>${row.v&&row.v[11]?`<button class="flag" data-cb="${esc(row.cod)}" data-cbl="${esc(lcod||"")}" title="Affianca l'analisi di questa lavorazione a un'analisi Lombardia (Modulo B)">⇄ Confronta</button>`:""}</td></tr>`;
   }
   h+=`</tbody></table></div>`;
   pan.innerHTML=h;
@@ -1284,6 +1285,20 @@ async function cmpList(sez,cls){
     if(f) openVoce({p:"P",v:f});
   });
   pan.querySelectorAll("a[data-cl]").forEach(a=>a.onclick=ev=>{ ev.preventDefault(); openAnyLom(a.dataset.cl); });
+  pan.querySelectorAll("button[data-cb]").forEach(b=>b.onclick=async()=>{
+    const d=await loadPart("P");
+    const pv=d.voci.find(x=>x[0]===b.dataset.cb);
+    if(!pv) return;
+    const lcod=b.dataset.cbl;
+    if(lcod){
+      await loadPart("A"); await loadPart("C");
+      for(const pp of ["A","C"]){
+        const lv=S.data[pp].voci.find(x=>x[0]===lcod);
+        if(lv){ renderCompare({p:"P",v:pv},{p:pp,v:lv}); return; }
+      }
+    }
+    openCompare("P",pv);
+  });
 }
 
 /* ---------- Modulo B: analisi affiancate PIE ↔ LOM ---------- */
