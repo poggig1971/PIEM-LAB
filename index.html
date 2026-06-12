@@ -353,6 +353,9 @@ async function searchAnalisi(terms){
 }
 
 function pieGrpOf(s){ if(/^AT/.test(s)) return "AT"; if(/^PR/.test(s)) return "PR"; if(/^RU/.test(s)) return "RU"; return "LAV"; }
+// Gruppi-scorciatoia trasversali: le sezioni restano anche nei gruppi originali
+const PIE_XGRP={SIC:["28","PR280"],ONE:["PR290"]};
+function pieInGrp(s,g){ return PIE_XGRP[g]?PIE_XGRP[g].includes(s):pieGrpOf(s)===g; }
 function buildPieIdx(d){
   if(d.sez) return;
   const sez={}, fam={};
@@ -368,18 +371,18 @@ function buildPieIdx(d){
   });
   d.sez=sez; d.fam=fam;
 }
-const PIE_GRPS=[["LAV","Lavorazioni"],["PR","Prodotti (PR)"],["AT","Noli e attrezzature (AT)"],["RU","Manodopera (RU)"]];
+const PIE_GRPS=[["LAV","Lavorazioni"],["PR","Prodotti (PR)"],["AT","Noli e attrezzature (AT)"],["RU","Manodopera (RU)"],["SIC","Sicurezza (D.Lgs. 81/08)"],["ONE","Oneri di conferimento"]];
 function renderPieSidebar(){
   const el=$("#tree"); el.innerHTML="";
   const d=S.data.P;
   if(!d) return;
   let h=`<div class="bluhead"><span>Gruppo</span><button id="pclr">azzera filtri</button></div>`;
   for(const [g,lab] of PIE_GRPS){
-    const ns=Object.keys(d.sez).filter(s=>d.sez[s].grp===g).length;
+    const ns=Object.keys(d.sez).filter(s=>pieInGrp(s,g)).length;
     h+=`<div class="pgr${S.pieGrp===g?" sel":""}" data-g="${g}"><span>${lab}</span><span class="n">${ns}</span></div>`;
   }
-  h+=`<div class="bluhead"><span>${S.pieGrp==="LAV"?"Tipologie":"Famiglie"}</span></div>`;
-  for(const s of Object.keys(d.sez).filter(x=>d.sez[x].grp===S.pieGrp).sort()){
+  h+=`<div class="bluhead"><span>${S.pieGrp==="LAV"?"Tipologie":(PIE_XGRP[S.pieGrp]?"Sezioni":"Famiglie")}</span></div>`;
+  for(const s of Object.keys(d.sez).filter(x=>pieInGrp(x,S.pieGrp)).sort()){
     const x=d.sez[s];
     h+=`<div class="psz${s===S.pieSez?" sel":""}${s.includes("COM")?" com":""}" data-s="${s}" title="${esc(x.nome)}">
       <div class="nm">${esc(x.nome)}</div>
