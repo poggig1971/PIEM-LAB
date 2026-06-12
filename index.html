@@ -134,6 +134,8 @@ table.an tr.foot td{font-weight:700;border-top:2px solid var(--navy);background:
 table.an tr.tot td{background:var(--navy);color:#fff;font-weight:800;font-size:13px}
 table.an a{color:var(--blue);text-decoration:none;font-family:Consolas,monospace;font-size:11px}
 table.an a:hover{text-decoration:underline}
+table.an tr.lomref td{background:#f6f8fb;color:#5a6577;font-size:11px;padding:2px 9px 6px;border-bottom:1px solid var(--border);border-left:3px solid var(--navy)}
+table.an tr.lomref a{font-weight:700}
 .flag{border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber);border-radius:6px;cursor:pointer;font-size:11px;font-weight:700;padding:3px 8px;line-height:1.2;white-space:nowrap}
 .flag:hover{filter:brightness(.95);transform:scale(1.05)}
 .sgbtn{border:1px solid var(--amber);background:var(--amber-bg);color:var(--amber);border-radius:8px;padding:4px 12px;font-size:11px;font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0}
@@ -759,6 +761,15 @@ async function rafList(sez, cls){
   });
 }
 
+/* ---------- riferimenti LOM per le componenti delle analisi PIE (matching automatico, da validare). ---------- */
+let PIELOM=null;
+async function loadPieLom(){
+  if(PIELOM) return PIELOM;
+  try{ const r=await fetch("data/pie_lom_ris.json"); PIELOM=await r.json(); }
+  catch(e){ PIELOM={}; }
+  return PIELOM;
+}
+
 /* ---------- dettaglio voce ---------- */
 async function getDetail(p,cod){
   if(p==="F") return null;
@@ -778,6 +789,7 @@ async function openVoce({p,v}){
   let det=null;
   try{ det=await getDetail(p,v[0]); }catch(e){}
   const an=det&&det.an;
+  if(an&&REGOF[p]==="PIE") await loadPieLom();
   const fk=p+"|"+v[0];
   let h=`<div class="phead">
     <span class="cod">${esc(reg.pfx)}${esc(v[0])}</span>
@@ -814,6 +826,8 @@ async function openVoce({p,v}){
         <td class="num">${fmt(r[4],3)}</td><td class="num">${fmt(r[5])}</td><td class="num">${fmt(r[6])}</td>
         <td class="num">${inc!=null?fmt(inc,1)+"%":"—"}</td>
         <td><button class="flag" data-ri="${ri}" title="Segnala anomalia su questa risorsa (descrizione, quantità, costi)">⚑ Segnala</button></td></tr>`;
+      const m=(REGOF[p]==="PIE"&&PIELOM)?PIELOM[r[1]]:null;
+      if(m) h+=`<tr class="lomref"><td></td><td colspan="7">≈ Rif. Lombardia 2026: <a href="#" data-lcod="${esc(m[0])}">${esc(m[0])}</a> — ${eur(m[1])}${m[4]?` / ${esc(r[3])}`:""}${m[2]!=null?` (Δ ${m[2]>0?"+":""}${fmt(m[2],1)}% su PIE)`:""}${m[3]?` · usata in ${m[3]} analisi LOM`:" · non usata nelle analisi LOM"}${m[4]?"":" · U.M. diverse"} · accoppiamento automatico: affidabilità ${esc(m[5])}${m[5]==="bassa"?" (da verificare)":""}</td></tr>`;
     });
     h+=`<tr class="foot"><td colspan="5">Sommano (A)</td><td class="num">${fmt(an.som)}</td><td></td><td></td></tr>
         <tr class="foot"><td colspan="5">Spese generali (B)${an.som?` — ${fmt(100*an.sg/an.som,1)}%`:""}</td><td class="num">${fmt(an.sg)}</td><td></td><td></td></tr>
@@ -867,6 +881,12 @@ async function openVoce({p,v}){
       const found=d.voci.find(x=>x[0]===cod);
       if(found){ openVoce({p:tp,v:found}); return; }
     }
+  });
+  pan.querySelectorAll("a[data-lcod]").forEach(a=>a.onclick=async ev=>{
+    ev.preventDefault();
+    const d=await loadPart("E");
+    const found=d.voci.find(x=>x[0]===a.dataset.lcod);
+    if(found) openVoce({p:"E",v:found});
   });
   const sa=document.getElementById("sgall");
   if(sa) sa.onclick=()=>openSegnala(p,v,null);
