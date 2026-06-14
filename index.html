@@ -1515,7 +1515,8 @@ async function loadTolSim(){ if(!TOLSIM){ const r=await fetch("data/tol_sim.json
 async function renderTolSim(){
   const d=await loadTolSim();
   if(!S.tolSel||!d.tol[S.tolSel]) S.tolSel="TOL.1";
-  renderTolMenu(d); renderTolOverview(d); renderTolDetail(d); setSticky();
+  const cb=$("#capbar"); cb.style.display="none"; cb.innerHTML="";
+  renderTolOverview(d); renderTolDetail(d); setSticky();
 }
 function renderTolMenu(d){
   const el=$("#capbar");
@@ -1564,11 +1565,15 @@ function renderTolDetail(d){
     <div class="kpi"><div class="k">Copertura paniere sul prezzario</div><div class="v">${o.cop}%</div></div>
   </div>
   <div class="sect"><h3>Andamento 2022-2026 <small>numero indice, base marzo 2022 = 100</small></h3>${tolChart(o.reg,o.naz,eds)}</div>
-  <div class="sect"><h3>Paniere ufficiale 2022 <small>struttura ISTAT — pesi per elemento di costo (KLEMS)</small></h3>
-  <div class="pf-row" style="margin-bottom:12px">`;
+  <div class="sect"><h3>Paniere e mappatura sul Prezzario Piemonte <small>cosa misura l'ISTAT per ogni componente e con quali voci del prezzario è stato calcolato il dato regionale</small></h3>
+  <div class="pf-row" style="margin-bottom:10px">`;
   for(const e of ["LAV","MAT","MAC","ENE","TRA","RIF"]) if(o.pesi[e]) h+=`<div class="pcap" style="cursor:default;margin-bottom:0"><b>${esc(ELN[e])}</b><span class="n">${o.pesi[e].toFixed(1)}%</span></div>`;
-  h+=`</div><table class="an"><thead><tr><th>El.</th><th>Componente elementare</th><th class="num">Peso %</th><th>Fonte ISTAT</th></tr></thead><tbody>`;
-  for(const c of o.comp) h+=`<tr><td style="white-space:nowrap">${esc(c.el)}</td><td>${esc(c.n)}</td><td class="num">${c.p.toFixed(1)}</td><td style="font-size:11px;color:#555">${esc(c.f||"")}</td></tr>`;
+  h+=`</div>
+  <div style="font-size:12px;color:#555;background:var(--bg);border-radius:8px;padding:8px 11px;margin-bottom:10px;line-height:1.5">
+    Il <b>dato regionale</b> della TOL è la media dei valori della colonna <b>«Indice reg. 2026»</b>, ponderata con i pesi ISTAT 2022. Ogni componente del paniere ISTAT (colonne a sinistra) è stato <b>agganciato</b> alle voci del Prezzario Piemonte indicate in <b>«Mappatura»</b>; l'<b>Indice reg. 2026</b> misura come quel prezzo regionale si è mosso dal 2022 (marzo 2022 = 100). Esempio: un valore 114 = +14% sul 2022.</div>
+  <table class="an"><thead><tr><th>El.</th><th>Componente (paniere ISTAT)</th><th class="num">Peso %</th><th>Fonte ISTAT</th><th>Mappatura sul Prezzario Piemonte</th><th class="num">Indice reg. 2026</th></tr></thead><tbody>`;
+  for(const c of o.comp){ const ri=c.ri, ric=(ri==null)?"#999":(ri>=103?"var(--red)":(ri<=97?"var(--navy)":"var(--green)"));
+    h+=`<tr><td style="white-space:nowrap">${esc(c.el)}</td><td>${esc(c.n)}</td><td class="num">${c.p.toFixed(1)}</td><td style="font-size:11px;color:#555">${esc(c.f||"")}</td><td style="font-size:11px">${esc(c.m||"")}</td><td class="num" style="font-weight:600;color:${ric}">${ri==null?"—":ri.toFixed(1)}</td></tr>`; }
   h+=`</tbody></table></div>
   <div style="font-size:12px;color:#666;margin-top:8px;line-height:1.5">
     <b>Nazionale</b> — ${esc(d.fonte_naz)}.<br><b>Regionale (simulato)</b> — ${esc(d.fonte_reg)}.<br>
