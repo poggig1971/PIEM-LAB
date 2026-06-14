@@ -416,8 +416,10 @@ function renderPieSidebar(){
   const d=S.data.P;
   if(!d) return;
   const sez=pieSezIdx(), fam=pieFamIdx();
-  let h=`<div class="bluhead"><span>Gruppo</span><button id="pclr">azzera filtri</button></div>`;
+  const grpOpen=S.grpOpen!==false;
+  let h=`<div class="bluhead"><span>Gruppo</span><span style="display:flex;gap:6px;align-items:center"><button id="grptog" title="Comprimi o espandi l'elenco gruppi">${grpOpen?"▾ comprimi":"▸ gruppi"}</button><button id="pclr">azzera filtri</button></span></div>`;
   for(const [g,lab] of PIE_GRPS){
+    if(!grpOpen && g!==S.pieGrp) continue;
     const ns=Object.keys(sez).filter(s=>pieInGrp(s,g)).length;
     h+=`<div class="pgr${S.pieGrp===g?" sel":""}" data-g="${g}"><span>${lab}</span><span class="n">${ns}</span></div>`;
   }
@@ -431,11 +433,15 @@ function renderPieSidebar(){
       <div class="cd">PIE26_${esc(s)}${caps?" · solo capitoli stradali":""} · ${nn.toLocaleString("it-IT")} voci</div></div>`;
   }
   el.innerHTML=h;
-  el.querySelectorAll(".pgr").forEach(b=>b.onclick=()=>{ S.pieGrp=b.dataset.g; S.pieSez=null; S.pieFam=null; S.pieCaps=null; renderPieSidebar(); renderCapBar(); applyFilter(); });
+  el.querySelectorAll(".pgr").forEach(b=>b.onclick=()=>{
+    if(S.grpOpen===false && b.dataset.g===S.pieGrp){ S.grpOpen=true; renderPieSidebar(); return; }
+    S.pieGrp=b.dataset.g; S.pieSez=null; S.pieFam=null; S.pieCaps=null; S.grpOpen=false; renderPieSidebar(); renderCapBar(); applyFilter();
+  });
+  const gt=document.getElementById("grptog"); if(gt) gt.onclick=()=>{ S.grpOpen=(S.grpOpen===false); renderPieSidebar(); };
   el.querySelectorAll(".psz").forEach(b=>b.onclick=()=>{ S.pieSez=(S.pieSez===b.dataset.s)?null:b.dataset.s; S.pieFam=null; S.pieCaps=S.pieSez?pieCapsOf(S.pieGrp,S.pieSez):null; renderPieSidebar(); renderCapBar(); applyFilter(); });
   const pc=document.getElementById("pclr");
   if(pc) pc.onclick=()=>{
-    S.pieSez=null; S.pieFam=null; S.pieCaps=null; S.q=""; $("#q").value="";
+    S.pieSez=null; S.pieFam=null; S.pieCaps=null; S.q=""; $("#q").value=""; S.grpOpen=true;
     $("#onlyan").checked=false; $("#onlycam").checked=false; $("#onlysic").checked=false; $("#onlyfav").checked=false; $("#inan").checked=false; $("#onlypriced").checked=true;
     renderPieSidebar(); renderCapBar(); applyFilter();
   };
@@ -1232,9 +1238,10 @@ function renderCmpSidebar(){
   const cnt={}, gcnt={PR:0,AT:0,RU:0,LAV:0};
   for(const row of D.rows){ cnt[row.s]=(cnt[row.s]||0)+1; gcnt[pieGrpOf(row.s)]++; }
   const GL=[["PR","Prodotti (PR)"],["AT","Noli e attrezzature (AT)"],["RU","Manodopera (RU)"],["LAV","Lavorazioni richiamate"]];
-  let h=`<div class="bluhead"><span>Gruppo</span><button id="cmpclr">azzera filtri</button></div>`;
-  h+=`<div class="pgr${CMP_GRP==null?" sel":""}" data-g=""><span>Tutte le componenti</span><span class="n">${D.rows.length.toLocaleString("it-IT")}</span></div>`;
-  for(const [g,lab] of GL) h+=`<div class="pgr${CMP_GRP===g?" sel":""}" data-g="${g}"><span>${lab}</span><span class="n">${gcnt[g].toLocaleString("it-IT")}</span></div>`;
+  const grpOpen=S.grpOpen!==false;
+  let h=`<div class="bluhead"><span>Gruppo</span><span style="display:flex;gap:6px;align-items:center"><button id="cmptog" title="Comprimi o espandi l'elenco gruppi">${grpOpen?"▾ comprimi":"▸ gruppi"}</button><button id="cmpclr">azzera filtri</button></span></div>`;
+  if(grpOpen||CMP_GRP==null) h+=`<div class="pgr${CMP_GRP==null?" sel":""}" data-g=""><span>Tutte le componenti</span><span class="n">${D.rows.length.toLocaleString("it-IT")}</span></div>`;
+  for(const [g,lab] of GL){ if(!grpOpen && g!==CMP_GRP) continue; h+=`<div class="pgr${CMP_GRP===g?" sel":""}" data-g="${g}"><span>${lab}</span><span class="n">${gcnt[g].toLocaleString("it-IT")}</span></div>`; }
   if(CMP_GRP){
     h+=`<div class="bluhead"><span>${CMP_GRP==="LAV"?"Tipologie":"Famiglie"}</span></div>`;
     for(const s of Object.keys(cnt).filter(s=>pieGrpOf(s)===CMP_GRP).sort()){
@@ -1243,10 +1250,15 @@ function renderCmpSidebar(){
     }
   }
   el.innerHTML=h;
-  el.querySelectorAll(".pgr").forEach(b=>b.onclick=()=>{ CMP_GRP=b.dataset.g||null; CMP_SEZ=null; renderCmpSidebar(); updateCmp(); });
+  el.querySelectorAll(".pgr").forEach(b=>b.onclick=()=>{
+    const g=b.dataset.g||null;
+    if(S.grpOpen===false && g===CMP_GRP){ S.grpOpen=true; renderCmpSidebar(); return; }
+    CMP_GRP=g; CMP_SEZ=null; S.grpOpen=g?false:true; renderCmpSidebar(); updateCmp();
+  });
+  const ct=document.getElementById("cmptog"); if(ct) ct.onclick=()=>{ S.grpOpen=(S.grpOpen===false); renderCmpSidebar(); };
   el.querySelectorAll(".psz").forEach(b=>b.onclick=()=>{ CMP_SEZ=(CMP_SEZ===b.dataset.s)?null:b.dataset.s; renderCmpSidebar(); updateCmp(); });
   const c=document.getElementById("cmpclr");
-  if(c) c.onclick=()=>{ CMP_GRP=null; CMP_SEZ=null; S.q=""; $("#q").value=""; renderCmpSidebar(); updateCmp(); };
+  if(c) c.onclick=()=>{ CMP_GRP=null; CMP_SEZ=null; S.q=""; $("#q").value=""; S.grpOpen=true; renderCmpSidebar(); updateCmp(); };
 }
 async function renderCmp(){
   $("#rescount").textContent="";
@@ -1620,7 +1632,7 @@ function renderRegions(){
     const b=document.createElement("button");
     b.className="reg"+(r===S.region?" active":"");
     b.innerHTML=esc(info.nome)+(r==="PAN"?'<span class="soon">solo analisi</span>':"")+(r==="RAF"?'<span class="soon">storico PIE</span>':"")+(r==="CMP"?'<span class="soon">risorse</span>':"");
-    b.onclick=async()=>{ S.region=r; S.path=null; S.sort=null; S.q=""; $("#q").value=""; S.pieSez=null; S.pieFam=null; S.pieCaps=null;
+    b.onclick=async()=>{ S.region=r; S.path=null; S.sort=null; S.q=""; $("#q").value=""; S.pieSez=null; S.pieFam=null; S.pieCaps=null; S.grpOpen=true;
       renderRegions(); renderHeader(); renderTabs(); showLoading();
       if(r==="RAF"||r==="CMP"||r==="TOL"){ $("#tree").innerHTML=""; if(r==="RAF") renderRaffronto(); else if(r==="CMP") renderCmp(); else renderTolSim(); return; }
       await loadPart(curPart()); renderTree(); applyFilter(); renderTabs(); };
