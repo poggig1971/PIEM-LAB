@@ -307,6 +307,13 @@ const REGIONS = {
     parts:[],
     stats:[["Componenti PIE","8.469"],["Con riferimento LOM","8.465"],["Risorse LOM","20.420"]],
   },
+  TOL:{
+    nome:"Simulazione TOL",
+    titolo:"Simulazione TOL Piemonte vs TOL",
+    fonte:"Indici di costo per Tipologie Omogenee di Lavorazioni (revisione prezzi art. 60 D.Lgs. 36/2023): confronto tra l'indice nazionale ISTAT e un TOL regionale simulato ricalcolando il paniere ufficiale 2022 sui prezzi del Prezzario Piemonte 2022-2026 — elaborazione ANCE non ufficiale",
+    parts:[],
+    stats:[["Indici TOL","20"],["Edizioni PIE","6"],["Base","2022=100"]],
+  },
 };
 const PARTS = {
   A:{label:"Parte 1 · Civile, Urbanizz., Difesa suolo, Agrofor.", short:"Parte 1 · Civile"},
@@ -541,6 +548,7 @@ function hasAnalisi(p,v){
 async function applyFilter(){
   if(S.region==="RAF"){ renderRaffronto(); return; }
   if(S.region==="CMP"){ if(CMPD&&$("#cmpout")) updateCmp(); else renderCmp(); return; }
+  if(S.region==="TOL"){ renderTolSim(); return; }
   const qn=norm(S.q.trim());
   const terms=qn.split(/\s+/).filter(t=>t.length>1);
   const onlyP=$("#onlypriced").checked;
@@ -1501,6 +1509,74 @@ async function renderCompare(pv,lv){
   });
 }
 
+/* ---------- Simulazione TOL Piemonte vs TOL ---------- */
+let TOLSIM=null;
+async function loadTolSim(){ if(!TOLSIM){ const r=await fetch("data/tol_sim.json"); TOLSIM=await r.json(); } return TOLSIM; }
+async function renderTolSim(){
+  const d=await loadTolSim();
+  if(!S.tolSel||!d.tol[S.tolSel]) S.tolSel="TOL.1";
+  renderTolMenu(d); renderTolOverview(d); renderTolDetail(d); setSticky();
+}
+function renderTolMenu(d){
+  const el=$("#capbar");
+  let h=`<div class="bluhead" style="margin-top:0"><span>Tipologie Omogenee di Lavorazioni (TOL) — seleziona per il dettaglio</span></div><div class="pf-row">`;
+  for(let i=1;i<=20;i++){ const t="TOL."+i,o=d.tol[t]; let nm=o.desc.length>40?o.desc.slice(0,40)+"…":o.desc;
+    h+=`<div class="pcap${t===S.tolSel?" sel":""}" data-t="${t}" title="${esc(o.desc)}" style="margin-bottom:0"><b>${t}</b>${esc(nm)}</div>`; }
+  h+=`</div>`; el.innerHTML=h; el.style.display="block";
+  el.querySelectorAll(".pcap").forEach(b=>b.onclick=()=>{ S.tolSel=b.dataset.t; renderTolSim(); });
+}
+function renderTolOverview(d){
+  const el=$("#tree");
+  let h=`<div class="bluhead"><span>Tutte le TOL · Δ 2026 (reg − naz)</span></div>`;
+  for(let i=1;i<=20;i++){ const t="TOL."+i,o=d.tol[t],dl=Math.round((o.reg[5]-o.naz[5])*10)/10;
+    const cls=dl>2?"b-red":(dl<-2?"b-blue":"b-green");
+    h+=`<div class="psz${t===S.tolSel?" sel":""}" data-t="${t}" title="${esc(o.desc)}">
+      <div class="nm">${t} · ${esc(o.desc.slice(0,40))}</div>
+      <div class="cd">reg ${o.reg[5].toFixed(1)} · naz ${o.naz[5].toFixed(1)} <span class="badge ${cls}">${dl>0?"+":""}${dl.toFixed(1)}</span></div></div>`; }
+  el.innerHTML=h;
+  el.querySelectorAll(".psz").forEach(b=>b.onclick=()=>{ S.tolSel=b.dataset.t; renderTolSim(); });
+}
+function tolChart(reg,naz,eds){
+  const W=720,H=300,padL=42,padR=120,padT=16,padB=46,navy="#1f3864",amber="#d97706";
+  const all=reg.concat(naz); let mn=Math.min(...all),mx=Math.max(...all);
+  mn=Math.floor((mn-2)/5)*5; mx=Math.ceil((mx+2)/5)*5; const n=eds.length;
+  const X=i=>padL+(W-padL-padR)*i/(n-1), Y=v=>padT+(H-padT-padB)*(1-(v-mn)/(mx-mn));
+  let g="";
+  for(let v=mn;v<=mx;v+=5){ const y=Y(v); g+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="#e5e7eb"/><text x="${padL-6}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="11" fill="#999">${v}</text>`; }
+  for(let i=0;i<n;i++){ const x=X(i); g+=`<line x1="${x.toFixed(1)}" y1="${padT}" x2="${x.toFixed(1)}" y2="${H-padB}" stroke="#f1f3f5"/><text x="${x.toFixed(1)}" y="${H-padB+18}" text-anchor="middle" font-size="10" fill="#555">${esc(eds[i].replace(" (straord.)",""))}</text>`; }
+  const line=(arr,col)=>{ const p=arr.map((v,i)=>`${i?"L":"M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    const dots=arr.map((v,i)=>`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.6" fill="${col}"/>`).join("");
+    return `<path d="${p}" fill="none" stroke="${col}" stroke-width="2.6"/>${dots}`; };
+  const lx=W-padR+12; let yR=Y(reg[n-1]),yN=Y(naz[n-1]); if(Math.abs(yR-yN)<13){ if(yR<yN){yR-=7;yN+=7;}else{yR+=7;yN-=7;} }
+  const leg=`<rect x="${lx}" y="${(yR-9).toFixed(1)}" width="10" height="10" rx="2" fill="${navy}"/><text x="${lx+15}" y="${yR.toFixed(1)}" font-size="11.5" fill="${navy}" font-weight="bold">Regionale ${reg[n-1].toFixed(1)}</text>`
+    +`<rect x="${lx}" y="${(yN-9).toFixed(1)}" width="10" height="10" rx="2" fill="${amber}"/><text x="${lx+15}" y="${yN.toFixed(1)}" font-size="11.5" fill="${amber}" font-weight="bold">Nazionale ${naz[n-1].toFixed(1)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:780px;height:auto;font-family:inherit">${g}${line(naz,amber)}${line(reg,navy)}${leg}</svg>`;
+}
+function renderTolDetail(d){
+  const t=S.tolSel,o=d.tol[t],eds=d.edizioni,r26=o.reg[5],n26=o.naz[5],dl=r26-n26;
+  const dcol=dl>2?"var(--red)":(dl<-2?"var(--navy)":"var(--green)");
+  const ELN={LAV:"Lavoro",MAT:"Materiali",MAC:"Macchine e attrezz.",ENE:"Energia",TRA:"Trasporto",RIF:"Rifiuti"};
+  let h=`<div style="font-size:18px;font-weight:700;color:var(--navy);margin:4px 0 12px">${esc(t)} — ${esc(o.desc)}</div>
+  <div class="kpis">
+    <div class="kpi"><div class="k">TOL regionale (Piemonte) 2026</div><div class="v">${r26.toFixed(1)}</div></div>
+    <div class="kpi"><div class="k">TOL nazionale ISTAT 2026</div><div class="v">${n26.toFixed(1)}</div></div>
+    <div class="kpi"><div class="k">Scostamento reg − naz</div><div class="v" style="color:${dcol}">${dl>0?"+":""}${dl.toFixed(1)}</div></div>
+    <div class="kpi"><div class="k">Copertura paniere sul prezzario</div><div class="v">${o.cop}%</div></div>
+  </div>
+  <div class="sect"><h3>Andamento 2022-2026 <small>numero indice, base marzo 2022 = 100</small></h3>${tolChart(o.reg,o.naz,eds)}</div>
+  <div class="sect"><h3>Paniere ufficiale 2022 <small>struttura ISTAT — pesi per elemento di costo (KLEMS)</small></h3>
+  <div class="pf-row" style="margin-bottom:12px">`;
+  for(const e of ["LAV","MAT","MAC","ENE","TRA","RIF"]) if(o.pesi[e]) h+=`<div class="pcap" style="cursor:default;margin-bottom:0"><b>${esc(ELN[e])}</b><span class="n">${o.pesi[e].toFixed(1)}%</span></div>`;
+  h+=`</div><table class="an"><thead><tr><th>El.</th><th>Componente elementare</th><th class="num">Peso %</th><th>Fonte ISTAT</th></tr></thead><tbody>`;
+  for(const c of o.comp) h+=`<tr><td style="white-space:nowrap">${esc(c.el)}</td><td>${esc(c.n)}</td><td class="num">${c.p.toFixed(1)}</td><td style="font-size:11px;color:#555">${esc(c.f||"")}</td></tr>`;
+  h+=`</tbody></table></div>
+  <div style="font-size:12px;color:#666;margin-top:8px;line-height:1.5">
+    <b>Nazionale</b> — ${esc(d.fonte_naz)}.<br><b>Regionale (simulato)</b> — ${esc(d.fonte_reg)}.<br>
+    Strumento di analisi non ufficiale ANCE: il TOL regionale stima come si sarebbe mossa la spesa, a parità di paniere, usando i prezzi del Prezzario Piemonte; non sostituisce gli indici ufficiali ISTAT per la revisione prezzi.</div>`;
+  $("#results").innerHTML=h;
+  $("#rescount").textContent=t+" di 20"; $("#crumb").innerHTML="";
+}
+
 /* ---------- regioni, tab e avvio ---------- */
 function renderRegions(){
   const el=$("#regions"); el.innerHTML="";
@@ -1511,7 +1587,7 @@ function renderRegions(){
     b.innerHTML=esc(info.nome)+(r==="PAN"?'<span class="soon">solo analisi</span>':"")+(r==="RAF"?'<span class="soon">storico PIE</span>':"")+(r==="CMP"?'<span class="soon">risorse</span>':"");
     b.onclick=async()=>{ S.region=r; S.path=null; S.sort=null; S.q=""; $("#q").value=""; S.pieSez=null; S.pieFam=null; S.pieCaps=null;
       renderRegions(); renderHeader(); renderTabs(); showLoading();
-      if(r==="RAF"||r==="CMP"){ $("#tree").innerHTML=""; if(r==="RAF") renderRaffronto(); else renderCmp(); return; }
+      if(r==="RAF"||r==="CMP"||r==="TOL"){ $("#tree").innerHTML=""; if(r==="RAF") renderRaffronto(); else if(r==="CMP") renderCmp(); else renderTolSim(); return; }
       await loadPart(curPart()); renderTree(); applyFilter(); renderTabs(); };
     el.appendChild(b);
   }
@@ -1541,8 +1617,8 @@ function renderTabs(){
   $("#lab-allparts").style.display = reg.parts.length>1 ? "" : "none";
   $("#lab-onlyan").style.display = (S.region==="PIE") ? "" : "none";
   $("#lab-lom").style.display = isPieReg() ? "" : "none";
-  document.querySelector(".searchbox").style.display = (S.region==="RAF") ? "none" : "";
-  document.querySelector(".treetitle").style.display = (isPieReg()||S.region==="RAF") ? "none" : "";
+  document.querySelector(".searchbox").style.display = (S.region==="RAF"||S.region==="TOL") ? "none" : "";
+  document.querySelector(".treetitle").style.display = (isPieReg()||S.region==="RAF"||S.region==="TOL") ? "none" : "";
   renderTree();
   renderCapBar();
   setSticky();
