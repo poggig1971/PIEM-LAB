@@ -274,7 +274,7 @@ const REGIONS = {
     stats:[["Voci di listino","45.252"],["Analisi prezzi","11.359"],["Sezioni","32"]],
   },
   PAN:{
-    nome:"PIE Analisi",
+    nome:"PIEM Analisi",
     titolo:"Prezzario Regionale Piemonte — Analisi prezzi 2026",
     fonte:'Solo le voci con analisi prezzi · D.G.R. 9 giugno 2026, n. 12-2656 · B.U. Regione Piemonte n. 23 S.s. n. 2 dell\'11 giugno 2026 · <a href="https://prezzario.regione.piemonte.it/2026" target="_blank" rel="noopener">Fonte ufficiale ↗</a>',
     pfx:"PIE26_",
@@ -1505,6 +1505,7 @@ async function renderCompare(pv,lv){
 function renderRegions(){
   const el=$("#regions"); el.innerHTML="";
   for(const [r,info] of Object.entries(REGIONS)){
+    if(r==="LOM") continue; // scheda Lombardia nascosta (la regione resta attiva per i link interni e il Raffronto LOM-PIE)
     const b=document.createElement("button");
     b.className="reg"+(r===S.region?" active":"");
     b.innerHTML=esc(info.nome)+(r==="PAN"?'<span class="soon">solo analisi</span>':"")+(r==="RAF"?'<span class="soon">storico PIE</span>':"")+(r==="CMP"?'<span class="soon">risorse</span>':"");
