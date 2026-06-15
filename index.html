@@ -27,6 +27,8 @@ h1{font-size:17px;font-weight:700}
 .dlxls{align-self:center;background:#1f7a3d;color:#fff;border-radius:8px;padding:8px 13px;font-size:13px;font-weight:700;text-decoration:none;white-space:nowrap;display:inline-flex;align-items:center;gap:5px;line-height:1.1}
 .dlxls:hover{background:#16622f}
 .dlxls span{font-weight:400;opacity:.85;font-size:11px}
+.fsbtn{align-self:center;background:#fff;color:var(--navy);border:2px solid #fff;border-radius:8px;padding:7px 13px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.fsbtn:hover{background:transparent;color:#fff}
 .hstat{background:var(--navy2);border:1px solid #3b5bb3;border-radius:8px;padding:3px 10px;text-align:center;min-width:88px}
 .hstat .k{font-size:9px;letter-spacing:.8px;text-transform:uppercase;opacity:.75}
 .hstat .v{font-size:13px;font-weight:700;margin-top:1px}
@@ -219,6 +221,7 @@ mark{background:#ffe89a;padding:0 1px;border-radius:2px}
     <div class="sub" id="h-fonte"></div>
   </div>
   <div class="hstats" id="hstats"></div>
+  <button class="fsbtn" onclick="toggleFs()" title="Apri la dashboard a tutto schermo">⛶ Schermo intero</button>
   <a class="dlxls" href="https://drive.google.com/drive/folders/1pvVvyQCNo3zzaBv2H7g9ZytYVcjj58Lz?usp=sharing" target="_blank" rel="noopener" title="Apre la cartella Drive con l'Excel di lavoro e gli Excel originali della Regione (file pesanti, per l'uso in locale)">Excel completi<span>cartella Drive ↗</span></a>
 </header>
 
@@ -337,6 +340,7 @@ const fmt=(n,d=2)=>n==null?"—":n.toLocaleString("it-IT",{minimumFractionDigits
 const eur=n=>n==null?"—":fmt(n)+" €";
 const norm=s=>s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toggleFs(){ try{ if(document.fullscreenElement){ document.exitFullscreen(); return; } const el=document.documentElement; if(el.requestFullscreen){ el.requestFullscreen().catch(()=>window.open(location.href,"_blank","noopener")); } else { window.open(location.href,"_blank","noopener"); } }catch(e){ window.open(location.href,"_blank","noopener"); } }
 const curPart=()=>S.part[S.region];
 const curReg=()=>REGIONS[S.region];
 
