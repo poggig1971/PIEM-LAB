@@ -271,6 +271,7 @@ mark{background:#ffe89a;padding:0 1px;border-radius:2px}
 
 <script>
 "use strict";
+const LAB = /lab/i.test(location.href);  // versione sperimentale (repo PIEM-LAB): mostra Raffronto LOM-PIE, Simulazione TOL e confronto Lombardia
 const REGIONS = {
   PIE:{
     nome:"Piemonte",
@@ -356,6 +357,7 @@ function toggleFav(key){
 
 async function loadPart(p){
   if(S.data[p]) return S.data[p];
+  if(!LAB && p!=="P"){ S.data[p]={voci:[],paths:[],tree:[]}; return S.data[p]; }
   const r = await fetch(`data/voci_${p}.json`);
   const d = await r.json();
   if(p==="F"){ d.tree = buildTreeF(d.voci); }
@@ -875,6 +877,7 @@ async function searchLomRis(q){
   renderTabs(); applyFilter();
 }
 async function loadPieLom(){
+  if(!LAB){ PIELOM=PIELOM||{}; return PIELOM; }
   if(PIELOM) return PIELOM;
   try{ const r=await fetch("data/pie_lom_ris.json"); PIELOM=await r.json(); }
   catch(e){ PIELOM={}; }
@@ -883,6 +886,7 @@ async function loadPieLom(){
 /* corrispondenze lavorazione PIE -> lavorazione LOM (Modulo B, solo coppie coerenti) */
 let PIELAV=null;
 async function loadPieLav(){
+  if(!LAB){ PIELAV=PIELAV||{}; return PIELAV; }
   if(!PIELAV){ try{ const r=await fetch("data/pie_lom_lav.json"); PIELAV=await r.json(); }catch(e){ PIELAV={}; } }
   return PIELAV;
 }
@@ -949,7 +953,7 @@ async function openVoce({p,v},opts={}){
   }
   if(det&&det.declx) h+=`<div class="sect"><h3>Lavorazione e specifiche tecniche</h3><div class="txt">${esc(det.declx)}</div></div>`;
   if(an){
-    h+=`<div class="sect" id="ansect"><h3>Analisi prezzi <small>scomposizione in risorse elementari</small> <button class="sgbtn" id="sgall">⚑ Segnala anomalia</button>${REGOF[p]==="PIE"&&Object.keys(LOMFIX).length?`<button class="sgbtn" id="fixexp" title="Scarica le correzioni dei riferimenti Lombardia salvate in questo browser">⬇ Correzioni LOM (${Object.keys(LOMFIX).length})</button>`:""}${REGOF[p]==="PIE"?`<button class="sgbtn" id="cmpb" title="Modulo B: affianca questa analisi a un'analisi del prezzario Lombardia">⇄ Confronta con LOM</button>`:""}</h3>
+    h+=`<div class="sect" id="ansect"><h3>Analisi prezzi <small>scomposizione in risorse elementari</small> <button class="sgbtn" id="sgall">⚑ Segnala anomalia</button>${LAB&&REGOF[p]==="PIE"&&Object.keys(LOMFIX).length?`<button class="sgbtn" id="fixexp" title="Scarica le correzioni dei riferimenti Lombardia salvate in questo browser">⬇ Correzioni LOM (${Object.keys(LOMFIX).length})</button>`:""}${LAB&&REGOF[p]==="PIE"?`<button class="sgbtn" id="cmpb" title="Modulo B: affianca questa analisi a un'analisi del prezzario Lombardia">⇄ Confronta con LOM</button>`:""}</h3>
     <table class="an"><thead><tr><th>Codice risorsa</th><th>Descrizione</th><th>U.M.</th><th class="num">Quantità</th><th class="num">Costo unit. €</th><th class="num">Costo €</th><th class="num">Inc. %</th><th></th></tr></thead><tbody>`;
     let lastCat="";
     const tot=an.tot||v[3];
@@ -1668,6 +1672,7 @@ function renderRegions(){
   const el=$("#regions"); el.innerHTML="";
   for(const [r,info] of Object.entries(REGIONS)){
     if(r==="LOM") continue; // scheda Lombardia nascosta (la regione resta attiva per i link interni e il Raffronto LOM-PIE)
+    if(!LAB && (r==="CMP"||r==="TOL")) continue; // schede sperimentali solo nella versione LAB
     const b=document.createElement("button");
     b.className="reg"+(r===S.region?" active":"");
     b.innerHTML=esc(info.nome)+(r==="PAN"?'<span class="soon">solo analisi</span>':"")+(r==="RAF"?'<span class="soon">storico PIE</span>':"")+(r==="CMP"?'<span class="soon">risorse</span>':"")+((r==="CMP"||r==="TOL")?'<span class="exp" title="Scheda sperimentale: elaborazione ANCE non ufficiale, dati indicativi da validare">sperimentale</span>':"");
@@ -1702,7 +1707,7 @@ function renderTabs(){
   }
   $("#lab-allparts").style.display = reg.parts.length>1 ? "" : "none";
   $("#lab-onlyan").style.display = (S.region==="PIE") ? "" : "none";
-  $("#lab-lom").style.display = isPieReg() ? "" : "none";
+  $("#lab-lom").style.display = (LAB && isPieReg()) ? "" : "none";
   document.querySelector(".searchbox").style.display = (S.region==="RAF"||S.region==="TOL") ? "none" : "";
   document.querySelector(".treetitle").style.display = (isPieReg()||S.region==="RAF"||S.region==="TOL") ? "none" : "";
   renderTree();
