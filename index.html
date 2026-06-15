@@ -31,6 +31,8 @@ nav.regions{display:flex;gap:8px;padding:10px 22px 0;background:#fff;flex-wrap:w
 .reg{border:2px solid var(--navy);background:#fff;border-radius:10px 10px 0 0;padding:9px 22px;cursor:pointer;font-size:14px;font-weight:700;color:var(--navy);border-bottom:none}
 .reg.active{background:var(--navy);color:#fff}
 .reg .soon{font-size:10px;font-weight:600;opacity:.65;margin-left:6px}
+.reg .exp{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:#e5e7eb;color:#6b7280;border-radius:6px;padding:1px 6px;margin-left:7px;vertical-align:middle}
+.reg.active .exp{background:rgba(255,255,255,.85);color:#334155}
 nav.tabs{display:flex;gap:8px;padding:10px 22px;background:#fff;border-bottom:1px solid var(--border);flex-wrap:wrap;position:sticky;top:0;z-index:30;box-shadow:0 2px 4px rgba(21,41,94,.06)}
 .tab{border:1px solid var(--border);background:#fff;border-radius:18px;padding:7px 16px;cursor:pointer;font-size:13px;font-weight:600;color:var(--navy)}
 .tab.active{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -1660,7 +1662,7 @@ function renderRegions(){
     if(r==="LOM") continue; // scheda Lombardia nascosta (la regione resta attiva per i link interni e il Raffronto LOM-PIE)
     const b=document.createElement("button");
     b.className="reg"+(r===S.region?" active":"");
-    b.innerHTML=esc(info.nome)+(r==="PAN"?'<span class="soon">solo analisi</span>':"")+(r==="RAF"?'<span class="soon">storico PIE</span>':"")+(r==="CMP"?'<span class="soon">risorse</span>':"");
+    b.innerHTML=esc(info.nome)+(r==="PAN"?'<span class="soon">solo analisi</span>':"")+(r==="RAF"?'<span class="soon">storico PIE</span>':"")+(r==="CMP"?'<span class="soon">risorse</span>':"")+((r==="CMP"||r==="TOL")?'<span class="exp" title="Scheda sperimentale: elaborazione ANCE non ufficiale, dati indicativi da validare">sperimentale</span>':"");
     b.onclick=async()=>{ S.region=r; S.path=null; S.sort=null; S.q=""; $("#q").value=""; S.pieSez=null; S.pieFam=null; S.pieCaps=null; S.grpOpen=true;
       renderRegions(); renderHeader(); renderTabs(); showLoading();
       if(r==="RAF"||r==="CMP"||r==="TOL"){ $("#tree").innerHTML=""; if(r==="RAF") renderRaffronto(); else if(r==="CMP") renderCmp(); else renderTolSim(); return; }
